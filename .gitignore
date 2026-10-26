@@ -1,6 +1,11 @@
 out/
+build/
+.gradle/
+local.properties
 *.class
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
+*.apk
 .idea/
 *.iml
 .vscode/

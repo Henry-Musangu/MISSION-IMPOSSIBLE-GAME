@@ -1,0 +1,36 @@
+# Compile automatiquement l'APK Android (et vérifie la version PC) à chaque envoi sur GitHub.
+# L'APK se télécharge dans l'onglet « Actions », section « Artifacts » de l'exécution.
+name: APK Android
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Compiler la version PC
+        run: |
+          mkdir -p out
+          javac -encoding UTF-8 -d out core/src/main/java/henry/*.java desktop/src/main/java/henry/desktop/*.java
+
+      - name: Compiler l'APK Android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug
+          cp android/build/outputs/apk/debug/app-debug.apk henry-le-herisson.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: henry-le-herisson-apk
+          path: henry-le-herisson.apk

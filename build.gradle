@@ -1,0 +1,4 @@
+// Projet racine : le cœur du jeu (core) et l'application Android (android).
+plugins {
+    id 'com.android.application' version '8.7.3' apply false
+}
