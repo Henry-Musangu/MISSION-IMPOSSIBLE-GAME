@@ -8,14 +8,18 @@ Henry, un hérisson violet à l'écharpe rouge, doit traverser trois zones et ba
 
 ## Jouer sur Android
 
-### Option 1 : télécharger l'APK compilé par GitHub
+### Option 1 : télécharger l'APK (le plus simple)
 
-À chaque envoi de code sur GitHub, l'APK est compilé automatiquement :
+Depuis le téléphone, ouvre ce lien :
 
-1. Sur GitHub, ouvre l'onglet **Actions** du dépôt, puis la dernière exécution « APK Android ».
-2. En bas de la page, dans **Artifacts**, télécharge `henry-le-herisson-apk` (un fichier .zip qui contient l'APK).
-3. Copie `henry-le-herisson.apk` sur le téléphone et ouvre-le. Android demande d'autoriser
-   l'installation d'applications provenant de cette source : accepte.
+**https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/latest/download/henry-le-herisson.apk**
+
+puis ouvre le fichier téléchargé. Android demande d'autoriser l'installation d'applications
+provenant de cette source (le navigateur) : accepte. L'icône « Henry le Hérisson » apparaît ensuite.
+
+L'APK est recompilé et republié automatiquement à chaque envoi de code sur GitHub
+(onglet **Actions** ; la Release s'appelle « android »). Pour mettre à jour le jeu,
+retélécharge-le avec le même lien.
 
 ### Option 2 : avec Android Studio
 

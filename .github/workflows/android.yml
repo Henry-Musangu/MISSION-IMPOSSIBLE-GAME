@@ -1,10 +1,14 @@
-# Compile automatiquement l'APK Android (et vérifie la version PC) à chaque envoi sur GitHub.
-# L'APK se télécharge dans l'onglet « Actions », section « Artifacts » de l'exécution.
+# Compile automatiquement l'APK Android (et vérifie la version PC) à chaque envoi sur GitHub,
+# puis le publie dans la Release « android » : lien direct à ouvrir depuis le téléphone
+# https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/latest/download/henry-le-herisson.apk
 name: APK Android
 
 on:
   push:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   apk:
@@ -34,3 +38,15 @@ jobs:
         with:
           name: henry-le-herisson-apk
           path: henry-le-herisson.apk
+
+      - name: Publier l'APK dans la Release « android »
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view android >/dev/null 2>&1; then
+            gh release upload android henry-le-herisson.apk --clobber
+          else
+            gh release create android henry-le-herisson.apk --target "$GITHUB_SHA" --latest \
+              --title "Henry le Hérisson pour Android" \
+              --notes "Télécharge henry-le-herisson.apk sur ton téléphone et ouvre-le pour installer le jeu. Ce fichier est remplacé automatiquement à chaque mise à jour du code."
+          fi
