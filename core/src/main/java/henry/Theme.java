@@ -90,6 +90,17 @@ final class Theme {
         return slopeTiles[type];
     }
 
+    /** Couleur du dessus du sol en relief ; une tuile sur deux un peu plus claire, comme des bandes d'herbe. */
+    int topColor(int tx) {
+        int base = style == FACTORY ? Col.rgb(0x868e96) : surface;
+        return (tx & 1) == 0 ? base : Col.brighter(base);
+    }
+
+    /** Couleur des côtés (falaises) en relief, en damier un peu plus sombre que la façade. */
+    int sideColor(int parity) {
+        return Col.darker((parity & 1) == 0 ? dirt1 : dirt2);
+    }
+
     /** Couleur de l'eau (ou du liquide) visible au fond des gouffres. */
     int liquid() {
         if (style == FACTORY) {

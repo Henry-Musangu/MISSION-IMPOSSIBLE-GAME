@@ -667,9 +667,15 @@ final class Player {
                 g.fillOval(-facing * i * 7 - 6, 6 - i * 3, 12, 6);
             }
         }
-        g.rotate(Math.toRadians(anim) * facing);
-        g.setColor(BODY);
+        // boule en relief : ombre en bas à droite, reflet en haut à gauche
+        g.setColor(BODY_DARK);
         g.fillOval(-15, -15, 30, 30);
+        g.setColor(BODY);
+        g.fillOval(-15, -15, 27, 27);
+        g.setColor(Col.argb(80, 0xffffff));
+        g.fillOval(-11, -12, 12, 8);
+        g.save();
+        g.rotate(Math.toRadians(anim) * facing);
         g.setColor(BODY_DARK);
         g.setStroke(3f);
         for (int i = 0; i < 3; i++) {
@@ -681,6 +687,7 @@ final class Player {
         g.setColor(SCARF);
         g.fillOval(-10, 4, 8, 6);
         g.setStroke(1f);
+        g.restore();
     }
 
     private void drawBody(Gfx g, int tick) {
@@ -729,9 +736,11 @@ final class Player {
         g.setStroke(1f);
         g.drawPolygon(qx, qy, qx.length);
 
-        // corps
-        g.setColor(BODY);
+        // corps (en relief : ombre puis couleur puis reflet)
+        g.setColor(BODY_DARK);
         g.fillOval(-8, -27, 16, 17);
+        g.setColor(BODY);
+        g.fillOval(-8, -27, 14, 15);
         g.setColor(SKIN);
         g.fillOval(-2, -24, 9, 12);
 
@@ -761,8 +770,13 @@ final class Player {
 
         // tête
         int lookY = lookingUp ? -3 : 0;
+        g.setColor(BODY_DARK);
+        g.fillOval(-9, -45 + lookY, 22, 21);
         g.setColor(BODY);
-        g.fillOval(-10, -46 + lookY, 22, 21);
+        g.fillOval(-10, -46 + lookY, 21, 20);
+        g.setColor(Col.argb(70, 0xffffff));
+        g.fillOval(-7, -44 + lookY, 9, 6);
+        g.setColor(BODY);
         g.fillPolygon(new double[] {-4, 0, 4}, new double[] {-42 + lookY, -51 + lookY, -43 + lookY}, 3);
         g.setColor(SKIN);
         g.fillOval(-1, -42 + lookY, 4, 5);

@@ -809,26 +809,98 @@ public final class Game {
         }
     }
 
+    // ----------------------------------------------------------------- rendu en relief (2,5D)
+
+    /** Distance focale de la perspective. */
+    private static final double FOCAL = 700;
+    /** Demi-épaisseur du décor : le sol va de z = -DEPTH (au fond) à z = +DEPTH (devant). */
+    private static final double DEPTH = 44;
+    /** Hauteur du point de fuite à l'écran : plus il est haut, plus on voit le dessus du sol. */
+    private static final double VPY = 120;
+
+    /** Caméra de l'image en cours (avec le tremblement). */
+    private double viewX;
+    private double viewY;
+
+    private static double scaleAt(double z) {
+        return FOCAL / (FOCAL - z);
+    }
+
+    /** Projection d'un point du monde (x, y, profondeur z) sur l'écran. */
+    private double sx(double x, double z) {
+        return W / 2.0 + (x - viewX - W / 2.0) * scaleAt(z);
+    }
+
+    private double sy(double y, double z) {
+        return VPY + (y - viewY - VPY) * scaleAt(z);
+    }
+
+    /**
+     * Place le repère de dessin sur le plan de profondeur z : ensuite on dessine en coordonnées
+     * du monde, comme en 2D (x moins la caméra, y du monde).
+     */
+    private void plane(Gfx g, double z) {
+        double s = scaleAt(z);
+        g.translate(W / 2.0 * (1 - s), VPY * (1 - s));
+        g.scale(s, s);
+        g.translate(0, -viewY);
+    }
+
+    /** Quadrilatère horizontal (dessus) entre x0 et x1, de la profondeur z0 à z1. */
+    private void topQuad(Gfx g, double x0, double y0, double x1, double y1, double z0, double z1) {
+        g.fillPolygon(new double[] {sx(x0, z0), sx(x1, z0), sx(x1, z1), sx(x0, z1)},
+                new double[] {sy(y0, z0), sy(y1, z0), sy(y1, z1), sy(y0, z1)}, 4);
+    }
+
+    /** Quadrilatère vertical (côté) à l'abscisse x, de y0 à y1. */
+    private void sideQuad(Gfx g, double x, double y0, double y1) {
+        g.fillPolygon(new double[] {sx(x, -DEPTH), sx(x, DEPTH), sx(x, DEPTH), sx(x, -DEPTH)},
+                new double[] {sy(y0, -DEPTH), sy(y0, DEPTH), sy(y1, DEPTH), sy(y1, -DEPTH)}, 4);
+    }
+
     private void renderWorld(Gfx g) {
-        double sx = 0;
-        double sy = 0;
+        double shx = 0;
+        double shy = 0;
         if (shake > 0) {
-            sx = random.nextInt(7) - 3;
-            sy = random.nextInt(7) - 3;
+            shx = random.nextInt(7) - 3;
+            shy = random.nextInt(7) - 3;
         }
-        double cam = camX - sx;
+        viewX = camX - shx;
+        viewY = Math.round(camY) - shy;
         double shift = (level.pixelHeight() - H - camY) * 0.25;
-        renderBackground(g, level.theme, cam, shift);
-        g.save();
-        g.translate(0, -Math.round(camY) + sy);
-        renderLiquid(g, cam);
-        for (Loop l : level.loops) {
-            l.draw(g, level.theme, cam);
-        }
-        renderTiles(g, cam);
+        Theme th = level.theme;
+        renderBackground(g, th, viewX, shift);
+
+        // 1. le fond : surface de l'eau, dessus et côtés du décor, décor lointain, ombres
+        renderLiquidTop(g);
+        renderTerrainFaces(g);
         for (Platform p : level.platforms) {
-            p.draw(g, level.theme, cam);
+            g.setColor(th.topColor(0));
+            topQuad(g, p.x, p.y, p.x + p.w, p.y, -DEPTH * 0.7, DEPTH);
         }
+        for (Monitor m : level.monitors) {
+            if (!m.broken && visible(m.x, Monitor.W)) {
+                g.setColor(Col.rgb(0x868e96));
+                topQuad(g, m.x, m.base - Monitor.H, m.x + Monitor.W, m.base - Monitor.H, -14, 0);
+            }
+        }
+        g.save();
+        plane(g, -DEPTH * 0.6);
+        renderDecorations(g, true);
+        g.restore();
+        renderSpikes(g, true);
+        for (Loop l : level.loops) {
+            g.save();
+            plane(g, -24);
+            l.draw(g, th, viewX);
+            g.restore();
+        }
+        renderShadows(g);
+
+        // 2. le plan du jeu (z = 0), à l'échelle 1 : la physique et le dessin coïncident
+        g.save();
+        plane(g, 0);
+        double cam = viewX;
         for (Checkpoint c : level.checkpoints) {
             c.draw(g, cam);
         }
@@ -875,6 +947,27 @@ public final class Game {
         for (Particle p : particles) {
             p.draw(g, cam);
         }
+        g.restore();
+
+        // 3. l'avant : bord des loopings, pics, façade du décor et fleurs
+        for (Loop l : level.loops) {
+            g.save();
+            plane(g, 24);
+            l.drawRim(g, th, viewX);
+            g.restore();
+        }
+        renderSpikes(g, false);
+        g.save();
+        plane(g, DEPTH);
+        renderLiquid(g, viewX);
+        for (Platform p : level.platforms) {
+            p.draw(g, th, viewX);
+        }
+        renderFrontTiles(g);
+        g.restore();
+
+        g.save();
+        plane(g, 0);
         for (Popup p : popups) {
             p.draw(g, cam);
         }
@@ -882,7 +975,232 @@ public final class Game {
     }
 
     private boolean visible(double x, double w) {
-        return x + w >= camX - 32 && x <= camX + W + 32;
+        return x + w >= camX - 64 && x <= camX + W + 64;
+    }
+
+    /** Une tuile qui a un volume (sol plein ou pente). */
+    private static boolean solid3d(byte t) {
+        return t == Level.SOLID || Level.isSlope(t);
+    }
+
+    /** Dessus (sol, herbe) et côtés (falaises) de chaque tuile, vus en perspective. */
+    private void renderTerrainFaces(Gfx g) {
+        Theme th = level.theme;
+        double eyeX = viewX + W / 2.0;
+        double eyeY = viewY + VPY;
+        int x0 = Math.max(0, (int) Math.floor((viewX - 80) / T));
+        int x1 = Math.min(level.w - 1, (int) ((viewX + W + 80) / T));
+        int y0 = Math.max(0, (int) Math.floor((viewY - 80) / T));
+        int y1 = Math.min(level.h - 1, (int) ((viewY + H + 80) / T));
+        for (int tx = x0; tx <= x1; tx++) {
+            double left = tx * T;
+            double right = left + T;
+            for (int ty = y0; ty <= y1; ty++) {
+                byte t = level.tile(tx, ty);
+                byte above = level.tile(tx, ty - 1);
+                if (t == Level.ONEWAY) {
+                    if (above == Level.EMPTY && ty * T > eyeY) {
+                        g.setColor(th.topColor(tx));
+                        topQuad(g, left, ty * T, right, ty * T, -DEPTH * 0.7, DEPTH);
+                    }
+                    continue;
+                }
+                if (!solid3d(t)) {
+                    continue;
+                }
+                double bottom = (ty + 1) * T;
+                double yl = bottom - Level.height(t, 0);
+                double yr = bottom - Level.height(t, T - 1);
+                // côtés : seulement ceux tournés vers la caméra
+                if (right < eyeX && !solid3d(level.tile(tx + 1, ty))) {
+                    g.setColor(th.sideColor(tx + ty));
+                    sideQuad(g, right, Math.max(yr, ty * T), bottom);
+                }
+                if (left > eyeX && !solid3d(level.tile(tx - 1, ty))) {
+                    g.setColor(th.sideColor(tx + ty));
+                    sideQuad(g, left, Math.max(yl, ty * T), bottom);
+                }
+                // dessus : visible seulement sous le niveau des yeux
+                if (!solid3d(above) && Math.min(yl, yr) > eyeY) {
+                    g.setColor(th.topColor(tx));
+                    topQuad(g, left, yl, right, yr, -DEPTH, DEPTH);
+                    g.setColor(Col.argb(60, 0xffffff));
+                    topQuad(g, left, yl, right, yr, -DEPTH, -DEPTH * 0.55);
+                }
+            }
+        }
+    }
+
+    /** Surface de l'eau (ou de la lave, du liquide toxique) qui s'étend vers le fond. */
+    private void renderLiquidTop(Gfx g) {
+        double top = level.pixelHeight() - 69;
+        if (top <= viewY + VPY) {
+            return;
+        }
+        g.setColor(Col.withAlpha(Col.brighter(level.theme.liquid()), 200));
+        topQuad(g, viewX - 200, top, viewX + W + 200, top, -DEPTH * 4, DEPTH);
+    }
+
+    /** Pics plantés sur plusieurs rangs de profondeur. */
+    private void renderSpikes(Gfx g, boolean back) {
+        double[] depths = back ? new double[] {-30, -10} : new double[] {10, 30};
+        int x0 = Math.max(0, (int) Math.floor((viewX - 64) / T));
+        int x1 = Math.min(level.w - 1, (int) ((viewX + W + 64) / T));
+        int y0 = Math.max(0, (int) Math.floor((viewY - 64) / T));
+        int y1 = Math.min(level.h - 1, (int) ((viewY + H + 64) / T));
+        for (double z : depths) {
+            boolean any = false;
+            for (int tx = x0; tx <= x1 && !any; tx++) {
+                for (int ty = y0; ty <= y1; ty++) {
+                    if (level.tile(tx, ty) == Level.SPIKE) {
+                        any = true;
+                        break;
+                    }
+                }
+            }
+            if (!any) {
+                continue;
+            }
+            g.save();
+            plane(g, z);
+            for (int tx = x0; tx <= x1; tx++) {
+                for (int ty = y0; ty <= y1; ty++) {
+                    if (level.tile(tx, ty) == Level.SPIKE) {
+                        g.drawSprite(level.theme.spikes(g), tx * T - viewX, ty * T);
+                    }
+                }
+            }
+            g.restore();
+        }
+    }
+
+    /** Ombres portées sur le sol, sous Henry, les robots et le boss. */
+    private void renderShadows(Gfx g) {
+        if (!player.dead && !player.inLoop()) {
+            shadow(g, player.centerX(), player.bottom(), 14);
+        }
+        for (Enemy e : level.enemies) {
+            if (e.alive && visible(e.x, e.w)) {
+                shadow(g, e.centerX(), e.y + e.h, 14);
+            }
+        }
+        if (boss != null && !boss.defeated) {
+            shadow(g, boss.centerX(), boss.y + Boss.H, 44);
+        }
+    }
+
+    private void shadow(Gfx g, double x, double fromY, double r) {
+        double gy = level.groundBelow(x, fromY, fromY, 2, 360);
+        if (Double.isNaN(gy) || gy <= viewY + VPY) {
+            return;
+        }
+        double k = Math.max(0, 1 - (gy - fromY) / 360);
+        if (k <= 0) {
+            return;
+        }
+        double rr = r * (0.55 + 0.45 * k);
+        double top = sy(gy, -rr * 0.7);
+        double bottom = sy(gy, rr * 0.7);
+        double cx = sx(x, 0);
+        g.setColor(Col.argb((int) (95 * k), 0));
+        g.fillOval(cx - rr, top, 2 * rr, Math.max(2, bottom - top));
+    }
+
+    /** Façade du décor (plan de devant) : le damier, l'herbe, les plates-formes. */
+    private void renderFrontTiles(Gfx g) {
+        Theme th = level.theme;
+        int camI = (int) Math.round(viewX);
+        int x0 = Math.max(0, camI / T - 1);
+        int x1 = Math.min(level.w - 1, (camI + W) / T + 1);
+        int y0 = Math.max(0, (int) (viewY / T) - 1);
+        int y1 = Math.min(level.h - 1, (int) ((viewY + H) / T) + 1);
+        for (int ty = y0; ty <= y1; ty++) {
+            for (int tx = x0; tx <= x1; tx++) {
+                byte t = level.tile(tx, ty);
+                int sx = tx * T - camI;
+                int sy = ty * T;
+                if (t == Level.SOLID) {
+                    byte above = level.tile(tx, ty - 1);
+                    boolean top = above == Level.EMPTY || above == Level.ONEWAY || above == Level.SPIKE;
+                    g.drawSprite(top ? th.top(g) : th.fill(g), sx, sy);
+                    if (top && above == Level.EMPTY && ty > 0) {
+                        decorate(g, th, tx, sx, sy, false);
+                    }
+                } else if (t == Level.ONEWAY) {
+                    g.drawSprite(th.platform(g), sx, sy);
+                } else if (Level.isSlope(t)) {
+                    g.drawSprite(th.slope(g, t), sx, sy);
+                }
+            }
+        }
+    }
+
+    /** Décor posé au fond du sol (palmiers, cactus, lampadaires). */
+    private void renderDecorations(Gfx g, boolean back) {
+        Theme th = level.theme;
+        int camI = (int) Math.round(viewX);
+        int x0 = Math.max(0, camI / T - 3);
+        int x1 = Math.min(level.w - 1, (camI + W) / T + 3);
+        int y0 = Math.max(1, (int) (viewY / T) - 3);
+        int y1 = Math.min(level.h - 1, (int) ((viewY + H) / T) + 3);
+        for (int tx = x0; tx <= x1; tx++) {
+            for (int ty = y0; ty <= y1; ty++) {
+                if (level.tile(tx, ty) == Level.SOLID && level.tile(tx, ty - 1) == Level.EMPTY) {
+                    decorate(g, th, tx, tx * T - camI, ty * T, back);
+                }
+            }
+        }
+    }
+
+    /**
+     * Décor posé sur le sol : au fond, les grands éléments (palmiers, cactus, lampadaires) ;
+     * devant, les fleurs.
+     */
+    private void decorate(Gfx g, Theme th, int tx, int sx, int sy, boolean back) {
+        int h = hash(tx);
+        if (h % 6 != 0) {
+            return;
+        }
+        int cx = sx + 8 + (h >> 4) % 16;
+        if (th.style == Theme.MEADOW) {
+            boolean palm = (h >> 9) % 3 == 0;
+            if (palm && back) {
+                drawPalm(g, cx, sy, h);
+            } else if (!palm && !back) {
+                g.setColor(Col.rgb(0x2b8a3e));
+                g.fillRect(cx - 1, sy - 14, 2, 14);
+                g.setColor((h >> 8) % 2 == 0 ? Col.rgb(0xffd43b) : Col.rgb(0xf783ac));
+                int sway = (int) (Math.sin(tick * 0.05 + tx) * 1.5);
+                for (int i = 0; i < 5; i++) {
+                    double a = i * Math.PI * 2 / 5 + tick * 0.02;
+                    g.fillOval(cx + sway + Math.cos(a) * 4 - 3, sy - 18 + Math.sin(a) * 4 - 3, 6, 6);
+                }
+                g.setColor(Col.rgb(0x7048e8));
+                g.fillOval(cx + sway - 2, sy - 20, 5, 5);
+            }
+        } else if (!back) {
+            return;
+        } else if (th.style == Theme.CANYON) {
+            g.setColor(Col.rgb(0x2f9e44));
+            g.fillRoundRect(cx - 4, sy - 26, 8, 26, 8);
+            g.fillRoundRect(cx - 12, sy - 18, 6, 10, 6);
+            g.fillRect(cx - 9, sy - 11, 6, 3);
+            g.fillRoundRect(cx + 6, sy - 22, 6, 10, 6);
+            g.fillRect(cx + 3, sy - 15, 6, 3);
+            g.setColor(Col.rgb(0x40c057));
+            g.fillRect(cx - 2, sy - 24, 1, 20);
+        } else {
+            g.setColor(Col.rgb(0x495057));
+            g.fillRect(cx - 2, sy - 40, 4, 40);
+            g.fillRect(cx - 2, sy - 40, 12, 3);
+            boolean on = (tick / 30 + tx) % 2 == 0;
+            g.setColor(on ? Col.rgb(0xffe066) : Col.rgb(0xffa94d));
+            g.fillOval(cx + 6, sy - 38, 6, 6);
+            if (on) {
+                g.setColor(Col.argb(40, 0xffe066));
+                g.fillPolygon(new double[] {cx + 9, cx - 6, cx + 24}, new double[] {sy - 35, sy, sy}, 3);
+            }
+        }
     }
 
     /** Eau, lave ou liquide toxique tout au fond : visible dans les gouffres. */
@@ -908,81 +1226,6 @@ public final class Game {
         for (int i = 0; i < 12; i++) {
             double x = wrap(i * 97 - cam * 0.9 + Math.sin(tick * 0.03 + i) * 20, W + 60) - 30;
             g.fillRect(x, top + 16 + (i % 3) * 14, 18 + (i % 4) * 6, 2);
-        }
-    }
-
-    private void renderTiles(Gfx g, double cam) {
-        Theme th = level.theme;
-        int camI = (int) Math.round(cam);
-        int x0 = Math.max(0, camI / T);
-        int x1 = Math.min(level.w - 1, (camI + W) / T + 1);
-        int y0 = Math.max(0, (int) (camY / T));
-        int y1 = Math.min(level.h - 1, (int) ((camY + H) / T) + 1);
-        for (int ty = y0; ty <= y1; ty++) {
-            for (int tx = x0; tx <= x1; tx++) {
-                byte t = level.tile(tx, ty);
-                int sx = tx * T - camI;
-                int sy = ty * T;
-                if (t == Level.SOLID) {
-                    byte above = level.tile(tx, ty - 1);
-                    boolean top = above == Level.EMPTY || above == Level.ONEWAY || above == Level.SPIKE;
-                    g.drawSprite(top ? th.top(g) : th.fill(g), sx, sy);
-                    if (top && above == Level.EMPTY && ty > 0) {
-                        decorate(g, th, tx, sx, sy);
-                    }
-                } else if (t == Level.ONEWAY) {
-                    g.drawSprite(th.platform(g), sx, sy);
-                } else if (t == Level.SPIKE) {
-                    g.drawSprite(th.spikes(g), sx, sy);
-                } else if (Level.isSlope(t)) {
-                    g.drawSprite(th.slope(g, t), sx, sy);
-                }
-            }
-        }
-    }
-
-    /** Fleurs, palmiers, cactus et lampadaires posés sur le sol. */
-    private void decorate(Gfx g, Theme th, int tx, int sx, int sy) {
-        int h = hash(tx);
-        if (h % 6 != 0) {
-            return;
-        }
-        int cx = sx + 8 + (h >> 4) % 16;
-        if (th.style == Theme.MEADOW) {
-            if ((h >> 9) % 3 == 0) {
-                drawPalm(g, cx, sy, h);
-                return;
-            }
-            g.setColor(Col.rgb(0x2b8a3e));
-            g.fillRect(cx - 1, sy - 14, 2, 14);
-            g.setColor((h >> 8) % 2 == 0 ? Col.rgb(0xffd43b) : Col.rgb(0xf783ac));
-            int sway = (int) (Math.sin(tick * 0.05 + tx) * 1.5);
-            for (int i = 0; i < 5; i++) {
-                double a = i * Math.PI * 2 / 5 + tick * 0.02;
-                g.fillOval(cx + sway + Math.cos(a) * 4 - 3, sy - 18 + Math.sin(a) * 4 - 3, 6, 6);
-            }
-            g.setColor(Col.rgb(0x7048e8));
-            g.fillOval(cx + sway - 2, sy - 20, 5, 5);
-        } else if (th.style == Theme.CANYON) {
-            g.setColor(Col.rgb(0x2f9e44));
-            g.fillRoundRect(cx - 4, sy - 26, 8, 26, 8);
-            g.fillRoundRect(cx - 12, sy - 18, 6, 10, 6);
-            g.fillRect(cx - 9, sy - 11, 6, 3);
-            g.fillRoundRect(cx + 6, sy - 22, 6, 10, 6);
-            g.fillRect(cx + 3, sy - 15, 6, 3);
-            g.setColor(Col.rgb(0x40c057));
-            g.fillRect(cx - 2, sy - 24, 1, 20);
-        } else {
-            g.setColor(Col.rgb(0x495057));
-            g.fillRect(cx - 2, sy - 40, 4, 40);
-            g.fillRect(cx - 2, sy - 40, 12, 3);
-            boolean on = (tick / 30 + tx) % 2 == 0;
-            g.setColor(on ? Col.rgb(0xffe066) : Col.rgb(0xffa94d));
-            g.fillOval(cx + 6, sy - 38, 6, 6);
-            if (on) {
-                g.setColor(Col.argb(40, 0xffe066));
-                g.fillPolygon(new double[] {cx + 9, cx - 6, cx + 24}, new double[] {sy - 35, sy, sy}, 3);
-            }
         }
     }
 
@@ -1258,12 +1501,23 @@ public final class Game {
         Theme th = Theme.PRAIRIE;
         renderBackground(g, th, cam, 0);
         int ground = 400;
+        // sol en relief : dessus rayé puis façade
+        viewX = cam;
+        viewY = 0;
+        int first = (int) Math.floor((cam - 80) / T);
+        for (int tx = first; tx * T < cam + W + 80; tx++) {
+            g.setColor(th.topColor(tx));
+            topQuad(g, tx * T, ground, (tx + 1) * T, ground, -DEPTH, DEPTH);
+        }
+        g.save();
+        plane(g, DEPTH);
         int off = (int) (cam % T);
-        for (int x = -off; x < W; x += T) {
+        for (int x = -off - T; x < W + T; x += T) {
             g.drawSprite(th.top(g), x, ground);
             g.drawSprite(th.fill(g), x, ground + T);
             g.drawSprite(th.fill(g), x, ground + 2 * T);
         }
+        g.restore();
         titleHenry.x = 660 - Player.W / 2.0;
         titleHenry.y = ground - Player.H;
         g.save();

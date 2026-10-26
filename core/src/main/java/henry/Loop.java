@@ -31,6 +31,20 @@ final class Loop {
         return cy() + R * Math.cos(a);
     }
 
+    /** Bord avant de la piste (dessiné devant Henry) : donne l'épaisseur du looping en relief. */
+    void drawRim(Gfx g, Theme th, double camX) {
+        double sx = cx - camX;
+        double cy = cy();
+        double r = R + 8;
+        g.setStroke(6f);
+        g.setColor(Col.withAlpha(th.dirt2, 230));
+        g.drawOval(sx - r, cy - r, 2 * r, 2 * r);
+        g.setStroke(2.5f);
+        g.setColor(th.surface);
+        g.drawOval(sx - R - 4, cy - R - 4, 2 * R + 8, 2 * R + 8);
+        g.setStroke(1f);
+    }
+
     void draw(Gfx g, Theme th, double camX) {
         double sx = cx - camX;
         double cy = cy();

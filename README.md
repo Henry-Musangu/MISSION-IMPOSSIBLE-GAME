@@ -6,6 +6,10 @@ Aucune bibliothèque externe ni fichier d'image ou de son : tout est dessiné et
 Henry, un hérisson violet à l'écharpe rouge, doit traverser trois zones et battre le
 **Dr. Vortex**, qui a enfermé les animaux dans ses robots.
 
+**En 2,5D :** le jeu se joue de gauche à droite comme les Sonic classiques, mais le décor est
+rendu en relief, en perspective : on voit le dessus du sol et des falaises, les ombres portées,
+les palmiers au fond et les fleurs devant, et l'épaisseur des loopings.
+
 **Au programme :** physique à élan sur les pentes, tremplins et **loopings**, 6 actes (3 zones × 2),
 un **boss différent à la fin de chaque zone**, moniteurs à bonus (bouclier, chaussures de vitesse,
 invincibilité, vie, anneaux), plates-formes mobiles, routes cachées en hauteur, **musiques originales**
