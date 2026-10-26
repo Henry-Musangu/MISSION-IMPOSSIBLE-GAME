@@ -182,6 +182,11 @@ final class CanvasGfx implements Gfx {
     }
 
     @Override
+    public void clipPolygon(double[] xs, double[] ys, int n) {
+        c.clipPath(polygon(xs, ys, n));
+    }
+
+    @Override
     public void save() {
         c.save();
     }

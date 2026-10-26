@@ -18,7 +18,7 @@ final class GameView extends SurfaceView implements SurfaceHolder.Callback, Runn
 
     private static final double STEP = 1.0 / 60.0;
 
-    private final Game game = new Game(true);
+    private final Game game;
     private final TouchControls controls = new TouchControls();
     private final CanvasGfx gfx = new CanvasGfx();
     /** Verrou séparé pour la taille : le fil de jeu ne doit jamais attendre le verrou de la vue. */
@@ -29,9 +29,14 @@ final class GameView extends SurfaceView implements SurfaceHolder.Callback, Runn
     private boolean resumed;
     private int width;
     private int height;
+    /** Placement de l'image du jeu dans l'écran (pour convertir les touchers). */
+    private volatile float offsetX;
+    private volatile float offsetY;
+    private volatile float scale;
 
     GameView(Context context) {
         super(context);
+        game = new Game(true, new AndroidStorage(context));
         getHolder().addCallback(this);
         setFocusable(true);
         setKeepScreenOn(true);
@@ -157,6 +162,9 @@ final class GameView extends SurfaceView implements SurfaceHolder.Callback, Runn
             float scale = Math.min(w / (float) Game.W, h / (float) Game.H);
             float ox = (w - Game.W * scale) / 2f;
             float oy = (h - Game.H * scale) / 2f;
+            this.scale = scale;
+            offsetX = ox;
+            offsetY = oy;
             boolean playing;
             c.save();
             c.translate(ox, oy);
@@ -179,7 +187,7 @@ final class GameView extends SurfaceView implements SurfaceHolder.Callback, Runn
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         synchronized (game) {
-            controls.onTouch(event, game);
+            controls.onTouch(event, game, offsetX, offsetY, scale);
         }
         return true;
     }

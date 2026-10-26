@@ -34,12 +34,14 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         hideSystemBars();
+        AndroidSound.resume();
         view.resume();
     }
 
     @Override
     protected void onPause() {
         view.pause();
+        AndroidSound.suspend();
         super.onPause();
     }
 

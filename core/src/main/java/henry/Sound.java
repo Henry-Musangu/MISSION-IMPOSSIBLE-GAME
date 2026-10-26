@@ -29,9 +29,15 @@ public final class Sound {
     /** Fréquence d'échantillonnage des sons générés (PCM 16 bits mono, little-endian). */
     public static final int RATE = 22050;
 
-    /** Joue un son déjà préparé. */
+    /** Ce que la plateforme sait faire : bruitages, musique en boucle et vibrations. */
     public interface Backend {
         void play(int id);
+
+        /** Joue la musique {@code track} en boucle ({@link Music}), ou l'arrête si -1. */
+        void music(int track);
+
+        /** Fait vibrer l'appareil (ignoré là où ce n'est pas possible). */
+        void vibrate(int millis);
     }
 
     private static final int SQUARE = 0;
@@ -40,12 +46,15 @@ public final class Sound {
 
     private static volatile Backend backend;
     private static volatile boolean enabled = true;
+    private static int currentMusic = -1;
+    private static boolean musicPaused;
 
     private Sound() {
     }
 
-    public static void setBackend(Backend b) {
+    public static synchronized void setBackend(Backend b) {
         backend = b;
+        applyMusic();
     }
 
     static void play(int id) {
@@ -59,8 +68,55 @@ public final class Sound {
         }
     }
 
-    public static void toggle() {
+    public static synchronized void toggle() {
         enabled = !enabled;
+        applyMusic();
+    }
+
+    public static synchronized void setEnabled(boolean on) {
+        enabled = on;
+        applyMusic();
+    }
+
+    /** Change de musique (sans la relancer si c'est déjà celle-là). -1 : silence. */
+    static synchronized void music(int track) {
+        if (track == currentMusic) {
+            return;
+        }
+        currentMusic = track;
+        applyMusic();
+    }
+
+    /** Coupe la musique pendant la pause, puis la relance. */
+    static synchronized void pauseMusic(boolean paused) {
+        if (paused == musicPaused) {
+            return;
+        }
+        musicPaused = paused;
+        applyMusic();
+    }
+
+    static void vibrate(int millis) {
+        Backend b = backend;
+        if (b != null && enabled) {
+            try {
+                b.vibrate(millis);
+            } catch (RuntimeException ignored) {
+                // pas de vibreur
+            }
+        }
+    }
+
+    private static void applyMusic() {
+        Backend b = backend;
+        if (b == null) {
+            return;
+        }
+        try {
+            b.music(enabled && !musicPaused ? currentMusic : -1);
+        } catch (RuntimeException ignored) {
+            // pas de musique
+        }
     }
 
     public static boolean isEnabled() {

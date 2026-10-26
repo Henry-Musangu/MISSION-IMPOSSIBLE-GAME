@@ -6,6 +6,12 @@ Aucune bibliothèque externe ni fichier d'image ou de son : tout est dessiné et
 Henry, un hérisson violet à l'écharpe rouge, doit traverser trois zones et battre le
 **Dr. Vortex**, qui a enfermé les animaux dans ses robots.
 
+**Au programme :** physique à élan sur les pentes, tremplins et **loopings**, 6 actes (3 zones × 2),
+un **boss différent à la fin de chaque zone**, moniteurs à bonus (bouclier, chaussures de vitesse,
+invincibilité, vie, anneaux), plates-formes mobiles, routes cachées en hauteur, **musiques originales**
+pour chaque zone, sauvegarde de la progression et du meilleur score, choix de la zone au menu,
+vibrations sur téléphone.
+
 ## Jouer sur Android
 
 ### Option 1 : télécharger l'APK (le plus simple)
@@ -62,17 +68,32 @@ Il faut Java 8 ou plus récent (JDK, pour avoir `javac`).
 
 - Ramasse des **anneaux** : si tu es touché, tu les perds au lieu de perdre une vie (tu peux en
   rattraper quelques-uns). Touché sans anneau = une vie perdue. 100 anneaux = une vie en plus.
-- Saute ou roule sur les **robots** pour libérer les animaux.
-- Les **ressorts** jaunes t'envoient très haut, les **pics** font mal.
+- Saute ou roule sur les **robots** pour libérer les animaux. Attention au **crabe** : il tire !
+- **Les pentes comptent** : on accélère en descente, on ralentit en montée. En boule (↓ en courant),
+  une descente donne énormément de vitesse. Un **looping** demande d'arriver vite.
+- Casse les **moniteurs** (télévisions) en sautant dessus :
+
+| Moniteur | Effet |
+| --- | --- |
+| Anneau | +10 anneaux |
+| Bulle bleue | **Bouclier** : protège d'un coup sans perdre d'anneaux |
+| Chaussure rouge | **Vitesse** pendant 15 secondes |
+| Étoile | **Invincible** pendant 20 secondes |
+| Tête d'Henry | Une vie en plus |
+
+- Les **ressorts** jaunes t'envoient très haut, vers des routes secrètes. Les **pics** font mal.
 - Touche les **bornes bleues** pour repartir de là après une chute.
-- Passe devant le **panneau** pour finir le niveau : plus tu vas vite, plus le bonus est gros.
-- Dans l'usine, touche le Dr. Vortex **8 fois** en boule pour gagner.
+- Passe devant le **panneau** pour finir l'acte : plus tu vas vite, plus le bonus est gros.
+- À la fin de chaque zone, le **Dr. Vortex** attaque : touche-le en boule jusqu'à vider sa jauge.
 
-## Les niveaux
+## Les zones
 
-1. **Zone Prairie Émeraude** : collines vertes, idéal pour apprendre.
-2. **Zone Canyon Crépuscule** : falaises, piliers au-dessus du vide et pics.
-3. **Usine du Dr. Vortex** : la zone finale et le combat contre le boss.
+1. **Prairie Émeraude** : collines, loopings et palmiers. Boss : bombes.
+2. **Canyon Crépuscule** : falaises, tremplins et plates-formes mobiles. Boss : bombes et boules de feu.
+3. **Usine du Dr. Vortex** : métal, liquide toxique et crabes. Boss final : bombes et piqués.
+
+Chaque acte terminé est sauvegardé : au menu, la ligne « zone » permet de rejouer n'importe quel
+acte déjà débloqué.
 
 ## Organisation du code
 
@@ -85,8 +106,11 @@ qu'afficher l'image, lire les commandes et jouer les sons.
 | `core/.../Player.java` | Physique et dessin d'Henry (élan, saut, roulade, spin dash) |
 | `core/.../Level.java`, `Levels.java` | Carte en tuiles et construction des trois niveaux |
 | `core/.../Theme.java` | Couleurs et tuiles de chaque zone |
-| `core/.../Enemy.java`, `Boss.java`, `Bomb.java` | Les robots et le Dr. Vortex |
-| `core/.../Ring.java`, `Spring.java`, `Checkpoint.java`, `Goal.java` | Objets du niveau |
+| `core/.../Enemy.java`, `Boss.java`, `Bomb.java`, `Shot.java` | Les robots, le Dr. Vortex et leurs projectiles |
+| `core/.../Ring.java`, `Spring.java`, `Checkpoint.java`, `Goal.java`, `Monitor.java` | Objets du niveau |
+| `core/.../Loop.java`, `Platform.java` | Loopings et plates-formes mobiles |
+| `core/.../Music.java` | Les musiques, écrites note par note et synthétisées |
+| `core/.../Storage.java` | Sauvegarde (meilleur score, zones débloquées, son) |
 | `core/.../Gfx.java` | Interface de dessin commune aux deux plateformes |
 | `core/.../Input.java`, `Sound.java` | Boutons du jeu et bruitages synthétisés |
 | `desktop/` | Version PC : fenêtre Swing, clavier, son javax.sound |
@@ -94,17 +118,23 @@ qu'afficher l'image, lire les commandes et jouer les sons.
 
 ### Créer ton propre niveau
 
-Dans `core/src/main/java/henry/Levels.java`, chaque niveau est construit avec de petites instructions :
+Dans `core/src/main/java/henry/Levels.java`, chaque acte est assemblé de gauche à droite
+avec des « segments » :
 
 ```java
-b.ground(0, 45, 11);    // sol de la colonne 0 à 45, surface à la ligne 11
-b.rings(8, 13, 9);      // anneaux de la colonne 8 à 13, ligne 9
-b.at(20, 10, 'E');      // un robot (E), une guêpe (B), un ressort (J),
-                        // une borne (C), le panneau d'arrivée (F), le départ (P)
-b.spikes(86, 87, 10);   // des pics
-b.plat(64, 69, 8);      // une plate-forme traversable par dessous
+int c = b.flat(12);        // 12 colonnes de sol plat (c = première colonne)
+b.put(c + 3, 'P');         // départ d'Henry posé sur le sol
+b.up45(3);                 // montée à 45° de 3 cases ; b.down45(3) pour descendre
+b.up22(2);                 // montée douce ; b.down22(2) pour descendre
+b.loop();                  // un looping
+c = b.pit(6);              // un gouffre de 6 colonnes
+b.movingH(c + 1, b.gr, 3, 2.5, 0.02);   // plate-forme mobile au-dessus
+b.put(c + 4, 'E');         // robot (E), guêpe (B), crabe (K), ressort (J), borne (C),
+                           // panneau (F), moniteurs '1' à '5'
+b.ringsOver(c, c + 6, 2);  // anneaux qui suivent le relief
+b.arena();                 // arène du boss (à la fin de l'acte 2)
 ```
 
-La grille fait 15 lignes de haut, et chaque case mesure 32 pixels.
+La grille fait 20 lignes de haut, et chaque case mesure 32 pixels.
 
 Pour changer la couleur d'Henry, modifie `BODY`, `SHOE` et `SCARF` au début de `Player.java`.

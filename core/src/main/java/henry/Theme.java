@@ -28,6 +28,7 @@ final class Theme {
     private Gfx.Sprite fillTile;
     private Gfx.Sprite platTile;
     private Gfx.Sprite spikeTile;
+    private final Gfx.Sprite[] slopeTiles = new Gfx.Sprite[10];
 
     private Theme(int style, int skyTop, int skyBottom, int far, int near, int dirt1, int dirt2,
             int surface, int surfaceEdge) {
@@ -73,6 +74,73 @@ final class Theme {
                 paintSpikes(s);
             }
         });
+        for (byte type = Level.UP45; type <= Level.DOWN22_LOW; type++) {
+            final byte tt = type;
+            slopeTiles[type] = g.makeSprite(t, t, new Gfx.Painter() {
+                @Override
+                public void paint(Gfx s) {
+                    paintSlope(s, tt);
+                }
+            });
+        }
+    }
+
+    Gfx.Sprite slope(Gfx g, byte type) {
+        ensureSprites(g);
+        return slopeTiles[type];
+    }
+
+    /** Couleur de l'eau (ou du liquide) visible au fond des gouffres. */
+    int liquid() {
+        if (style == FACTORY) {
+            return Col.argb(200, 0x37b24d);
+        } else if (style == CANYON) {
+            return Col.argb(210, 0xd9480f);
+        }
+        return Col.argb(170, 0x1c7ed6);
+    }
+
+    /** Pente : damier découpé sous la ligne du sol, puis bande d'herbe qui suit la pente. */
+    private void paintSlope(Gfx g, byte type) {
+        int t = Game.T;
+        int n = t + 1;
+        double[] xs = new double[n + 2];
+        double[] ys = new double[n + 2];
+        for (int i = 0; i < n; i++) {
+            xs[i] = i;
+            ys[i] = t - Level.height(type, Math.min(i, t - 1));
+        }
+        xs[n] = t;
+        ys[n] = t;
+        xs[n + 1] = 0;
+        ys[n + 1] = t;
+        g.save();
+        g.clipPolygon(xs, ys, n + 2);
+        paintFill(g);
+        g.restore();
+        // bande de surface qui suit la pente
+        int band = style == FACTORY ? 9 : 10;
+        double[] bx = new double[2 * n];
+        double[] by = new double[2 * n];
+        for (int i = 0; i < n; i++) {
+            bx[i] = xs[i];
+            by[i] = ys[i];
+            bx[2 * n - 1 - i] = xs[i];
+            by[2 * n - 1 - i] = Math.min(t, ys[i] + band);
+        }
+        g.save();
+        g.clipPolygon(xs, ys, n + 2);
+        g.setColor(surfaceEdge);
+        g.fillPolygon(bx, by, 2 * n);
+        g.restore();
+        for (int i = 0; i < n; i++) {
+            by[2 * n - 1 - i] = Math.min(t, ys[i] + band - 3);
+        }
+        g.save();
+        g.clipPolygon(xs, ys, n + 2);
+        g.setColor(surface);
+        g.fillPolygon(bx, by, 2 * n);
+        g.restore();
     }
 
     Gfx.Sprite top(Gfx g) {

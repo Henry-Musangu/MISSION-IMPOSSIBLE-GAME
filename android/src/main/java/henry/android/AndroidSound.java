@@ -2,28 +2,43 @@ package henry.android;
 
 import android.content.Context;
 import android.media.AudioAttributes;
+import android.media.MediaPlayer;
 import android.media.SoundPool;
+import android.os.Build;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import henry.Music;
 import henry.Sound;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
 /**
- * Joue les bruitages du jeu avec SoundPool. Les sons sont synthétisés au démarrage
- * puis écrits en fichiers WAV dans le cache de l'application.
+ * Sons sur Android : bruitages avec SoundPool, musique en boucle avec MediaPlayer, vibreur.
+ * Tout est synthétisé au démarrage puis écrit en fichiers WAV dans le cache de l'application ;
+ * les musiques sont préparées en arrière-plan pour ne pas ralentir le lancement.
  */
 final class AndroidSound implements Sound.Backend {
 
-    private static SoundPool pool;
+    private static AndroidSound instance;
 
+    private final SoundPool pool;
     private final int[] ids;
+    private final File[] songFiles = new File[Music.COUNT];
+    private final Vibrator vibrator;
+    private MediaPlayer player;
+    private int wanted = -1;
+    private int playingTrack = -1;
+    private boolean suspended;
 
-    private AndroidSound(int[] ids) {
+    private AndroidSound(Context context, SoundPool pool, int[] ids) {
+        this.pool = pool;
         this.ids = ids;
+        this.vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
     }
 
     static void install(Context context) {
-        if (pool != null) {
+        if (instance != null) {
             return;
         }
         try {
@@ -33,32 +48,152 @@ final class AndroidSound implements Sound.Backend {
                     .build();
             SoundPool sp = new SoundPool.Builder().setMaxStreams(8).setAudioAttributes(attrs).build();
             int[] ids = new int[Sound.COUNT];
-            File dir = context.getCacheDir();
+            final File dir = context.getCacheDir();
             for (int i = 0; i < Sound.COUNT; i++) {
                 File f = new File(dir, "henry_son_" + i + ".wav");
                 writeWav(f, Sound.synthesize(i));
                 ids[i] = sp.load(f.getAbsolutePath(), 1);
             }
-            pool = sp;
-            Sound.setBackend(new AndroidSound(ids));
+            final AndroidSound s = new AndroidSound(context.getApplicationContext(), sp, ids);
+            instance = s;
+            Sound.setBackend(s);
+            Thread prepare = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    s.prepareSongs(dir);
+                }
+            }, "henry-musique");
+            prepare.setPriority(Thread.MIN_PRIORITY);
+            prepare.start();
         } catch (Exception e) {
             // pas de son : le jeu reste jouable
         }
     }
 
+    /** Synthétise toutes les musiques (une seule fois) dans des fichiers WAV. */
+    private void prepareSongs(File dir) {
+        for (int t = 0; t < Music.COUNT; t++) {
+            try {
+                File f = new File(dir, "henry_musique_v1_" + t + ".wav");
+                if (!f.exists() || f.length() < 1000) {
+                    File tmp = new File(dir, "henry_musique_tmp.wav");
+                    writeWav(tmp, Music.render(t));
+                    if (!tmp.renameTo(f)) {
+                        continue;
+                    }
+                }
+                synchronized (this) {
+                    songFiles[t] = f;
+                    if (wanted == t && playingTrack != t) {
+                        startTrack(t);
+                    }
+                }
+            } catch (IOException e) {
+                // cette musique ne sera pas jouée
+            }
+        }
+    }
+
     static void release() {
         Sound.setBackend(null);
-        if (pool != null) {
-            pool.release();
-            pool = null;
+        AndroidSound s = instance;
+        instance = null;
+        if (s != null) {
+            synchronized (s) {
+                s.stopPlayer();
+            }
+            s.pool.release();
+        }
+    }
+
+    /** L'application passe en arrière-plan : la musique s'arrête. */
+    static void suspend() {
+        AndroidSound s = instance;
+        if (s != null) {
+            synchronized (s) {
+                s.suspended = true;
+                if (s.player != null && s.player.isPlaying()) {
+                    s.player.pause();
+                }
+            }
+        }
+    }
+
+    /** Retour au premier plan : la musique reprend là où elle était. */
+    static void resume() {
+        AndroidSound s = instance;
+        if (s != null) {
+            synchronized (s) {
+                s.suspended = false;
+                if (s.player != null && s.wanted >= 0) {
+                    s.player.start();
+                }
+            }
         }
     }
 
     @Override
     public void play(int id) {
-        SoundPool sp = pool;
-        if (sp != null) {
-            sp.play(ids[id], 1f, 1f, 1, 0, 1f);
+        pool.play(ids[id], 1f, 1f, 1, 0, 1f);
+    }
+
+    @Override
+    public synchronized void music(int track) {
+        wanted = track;
+        if (track == playingTrack) {
+            return;
+        }
+        stopPlayer();
+        if (track >= 0 && songFiles[track] != null) {
+            startTrack(track);
+        }
+    }
+
+    private void startTrack(int track) {
+        stopPlayer();
+        try {
+            MediaPlayer mp = new MediaPlayer();
+            mp.setAudioAttributes(new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_GAME)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build());
+            mp.setDataSource(songFiles[track].getAbsolutePath());
+            mp.setLooping(true);
+            mp.setVolume(0.55f, 0.55f);
+            mp.prepare();
+            if (!suspended) {
+                mp.start();
+            }
+            player = mp;
+            playingTrack = track;
+        } catch (Exception e) {
+            playingTrack = -1;
+        }
+    }
+
+    private void stopPlayer() {
+        if (player != null) {
+            try {
+                player.stop();
+            } catch (IllegalStateException ignored) {
+                // déjà arrêté
+            }
+            player.release();
+            player = null;
+        }
+        playingTrack = -1;
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void vibrate(int millis) {
+        if (vibrator == null || !vibrator.hasVibrator()) {
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 26) {
+            vibrator.vibrate(VibrationEffect.createOneShot(millis, VibrationEffect.DEFAULT_AMPLITUDE));
+        } else {
+            vibrator.vibrate(millis);
         }
     }
 

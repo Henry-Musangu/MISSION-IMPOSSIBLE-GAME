@@ -19,6 +19,9 @@ public final class Input {
     private final boolean[] down = new boolean[COUNT];
     private final boolean[] prev = new boolean[COUNT];
     private final boolean[] tapped = new boolean[COUNT];
+    /** Touchers sur l'écran pendant cette image, en coordonnées du jeu (x, y, x, y…). */
+    private final double[] taps = new double[16];
+    private int tapCount;
 
     /** Bouton maintenu ou relâché. */
     public synchronized void set(int button, boolean value) {
@@ -31,6 +34,31 @@ public final class Input {
     /** Appui bref (un toucher rapide sur l'écran) : compte comme un appui pour l'image suivante. */
     public synchronized void tap(int button) {
         tapped[button] = true;
+    }
+
+    /** Toucher à l'écran, en coordonnées du jeu (0..W, 0..H). */
+    public synchronized void tapAt(double x, double y) {
+        if (tapCount < taps.length / 2) {
+            taps[2 * tapCount] = x;
+            taps[2 * tapCount + 1] = y;
+            tapCount++;
+        }
+    }
+
+    synchronized boolean anyTap() {
+        return tapCount > 0;
+    }
+
+    /** Vrai si un toucher de cette image tombe dans le rectangle. */
+    synchronized boolean tappedIn(double x, double y, double w, double h) {
+        for (int i = 0; i < tapCount; i++) {
+            double tx = taps[2 * i];
+            double ty = taps[2 * i + 1];
+            if (tx >= x && tx <= x + w && ty >= y && ty <= y + h) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public synchronized void releaseAll() {
@@ -49,6 +77,7 @@ public final class Input {
             prev[i] = down[i];
             tapped[i] = false;
         }
+        tapCount = 0;
     }
 
     private synchronized boolean held(int b) {
@@ -85,6 +114,22 @@ public final class Input {
 
     boolean startPressed() {
         return pressed(START) || pressed(JUMP);
+    }
+
+    boolean upPressed() {
+        return pressed(UP);
+    }
+
+    boolean downPressed() {
+        return pressed(DOWN);
+    }
+
+    boolean leftPressed() {
+        return pressed(LEFT);
+    }
+
+    boolean rightPressed() {
+        return pressed(RIGHT);
     }
 
     boolean pausePressed() {

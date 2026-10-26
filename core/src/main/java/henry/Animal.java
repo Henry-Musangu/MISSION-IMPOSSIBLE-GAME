@@ -31,7 +31,7 @@ final class Animal {
                 vy = -4.5;
             }
         }
-        return --life > 0 && y < Game.H + 40;
+        return --life > 0 && y < level.pixelHeight() + 40;
     }
 
     void draw(Gfx g, double camX) {

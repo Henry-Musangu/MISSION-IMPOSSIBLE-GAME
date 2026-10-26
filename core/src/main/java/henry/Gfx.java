@@ -51,6 +51,9 @@ public interface Gfx {
 
     void drawText(String s, double x, double y);
 
+    /** Limite les dessins suivants à l'intérieur du polygone (jusqu'au prochain {@link #restore()}). */
+    void clipPolygon(double[] xs, double[] ys, int n);
+
     void save();
 
     void restore();

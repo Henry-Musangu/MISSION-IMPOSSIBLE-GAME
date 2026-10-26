@@ -15,12 +15,14 @@ public final class Game {
 
     private static final int TIME_LIMIT = 10 * 60 * 60;
     private static final int YELLOW = Col.rgb(0xffd43b);
+    private static final int FADE = 24;
 
     enum State { TITLE, PLAY, CLEAR, GAME_OVER, VICTORY }
 
     public final Input input = new Input();
     /** Sur téléphone, les textes parlent de toucher l'écran plutôt que du clavier. */
     private final boolean touchMode;
+    private final Storage storage;
     private final Input noInput = new Input();
     private final Random random = new Random();
 
@@ -32,18 +34,26 @@ public final class Game {
     private final List<Particle> particles = new ArrayList<>();
     private final List<Animal> animals = new ArrayList<>();
     private final List<Bomb> bombs = new ArrayList<>();
+    private final List<Shot> shots = new ArrayList<>();
+    private final List<Popup> popups = new ArrayList<>();
     private Boss boss;
     private boolean bossDone;
 
     int score;
     int lives = 3;
     private int bestScore;
+    /** Dernier acte débloqué (0 à COUNT-1). */
+    private int unlocked;
     int timeFrames;
     private int tick;
     private double camX;
+    private double camY;
     private double lead;
+    private int shake;
     private int introTimer;
     private int stateTimer;
+    private int fadeIn;
+    private int fadeOut;
     private boolean paused;
     private int nextLifeRings = 100;
 
@@ -55,14 +65,22 @@ public final class Game {
     private int timeBonus;
     private int ringBonus;
 
+    private int menuIndex;
+    private int menuLevel;
+
     private final Player titleHenry = new Player(0, 0);
 
     public Game() {
-        this(false);
+        this(false, new Storage.Memory());
     }
 
-    public Game(boolean touchMode) {
+    public Game(boolean touchMode, Storage storage) {
         this.touchMode = touchMode;
+        this.storage = storage;
+        bestScore = storage.getInt("meilleur", 0);
+        unlocked = Math.max(0, Math.min(Levels.COUNT - 1, storage.getInt("niveau", 0)));
+        menuLevel = unlocked;
+        Sound.setEnabled(storage.getInt("son", 1) == 1);
     }
 
     /** Vrai pendant une partie (utile pour savoir quoi faire du bouton « retour » d'Android). */
@@ -86,7 +104,10 @@ public final class Game {
     public void update() {
         tick++;
         if (input.mutePressed()) {
-            Sound.toggle();
+            toggleSound();
+        }
+        if (shake > 0) {
+            shake--;
         }
         switch (state) {
             case TITLE:
@@ -101,27 +122,106 @@ public final class Game {
             case GAME_OVER:
             case VICTORY:
                 stateTimer++;
-                if (stateTimer > 60 && input.startPressed()) {
+                if (stateTimer > 60 && (input.startPressed() || input.anyTap())) {
                     state = State.TITLE;
                     stateTimer = 0;
+                    menuLevel = unlocked;
                 }
                 break;
             default:
                 break;
         }
+        updateMusic();
         input.endFrame();
     }
 
+    private void toggleSound() {
+        Sound.toggle();
+        storage.putInt("son", Sound.isEnabled() ? 1 : 0);
+    }
+
+    private void updateMusic() {
+        int track;
+        switch (state) {
+            case TITLE:
+            case VICTORY:
+                track = Music.TITLE;
+                break;
+            case PLAY:
+                if (boss != null && !boss.defeated) {
+                    track = Music.BOSS;
+                } else if (bossDone || (level.goal != null && level.goal.passed)) {
+                    track = -1;
+                } else {
+                    track = Music.PRAIRIE + level.zoneIndex;
+                }
+                break;
+            default:
+                track = -1;
+                break;
+        }
+        Sound.music(track);
+        Sound.pauseMusic(state == State.PLAY && (paused || (player != null && player.dead)));
+    }
+
+    // ----------------------------------------------------------------- menu titre
+
+    private static final int MENU_Y = 238;
+    private static final int MENU_GAP = 40;
+    private static final int MENU_W = 400;
+
     private void updateTitle() {
         titleHenry.anim += 9;
-        titleHenry.vx = 9;
+        titleHenry.gsp = 9;
         titleHenry.onGround = true;
-        if (input.startPressed()) {
-            score = 0;
-            lives = 3;
-            levelIndex = 0;
-            startLevel(true);
+        int items = 3;
+        if (input.upPressed()) {
+            menuIndex = (menuIndex + items - 1) % items;
         }
+        if (input.downPressed()) {
+            menuIndex = (menuIndex + 1) % items;
+        }
+        if (menuIndex == 1) {
+            if (input.leftPressed()) {
+                menuLevel = Math.max(0, menuLevel - 1);
+            }
+            if (input.rightPressed()) {
+                menuLevel = Math.min(unlocked, menuLevel + 1);
+            }
+        }
+        // toucher direct sur les lignes du menu
+        double mx = (W - MENU_W) / 2.0;
+        for (int i = 0; i < items; i++) {
+            double my = MENU_Y + i * MENU_GAP - 26;
+            if (input.tappedIn(mx, my, MENU_W, 34)) {
+                menuIndex = i;
+                if (i == 1 && input.tappedIn(mx, my, 70, 34)) {
+                    menuLevel = Math.max(0, menuLevel - 1);
+                } else if (i == 1 && input.tappedIn(mx + MENU_W - 70, my, 70, 34)) {
+                    menuLevel = Math.min(unlocked, menuLevel + 1);
+                } else {
+                    activateMenu(i);
+                }
+                return;
+            }
+        }
+        if (input.startPressed()) {
+            activateMenu(menuIndex);
+        }
+    }
+
+    private void activateMenu(int item) {
+        if (item == 2) {
+            toggleSound();
+            return;
+        }
+        if (item == 1 && unlocked == 0) {
+            return;
+        }
+        score = 0;
+        lives = 3;
+        levelIndex = item == 0 ? 0 : menuLevel;
+        startLevel(true);
     }
 
     /** Démarre ou redémarre le niveau courant. */
@@ -148,15 +248,22 @@ public final class Game {
         particles.clear();
         animals.clear();
         bombs.clear();
+        shots.clear();
+        popups.clear();
         boss = null;
         bossDone = false;
         nextLifeRings = 100;
         introTimer = 160;
+        fadeIn = FADE;
+        fadeOut = 0;
         paused = false;
         lead = 0;
-        camX = clampCamera(player.centerX() - W / 2.0);
+        camX = clampCamX(player.centerX() - W / 2.0);
+        camY = clampCamY(targetCamY());
         state = State.PLAY;
     }
+
+    // ----------------------------------------------------------------- partie
 
     private void updatePlay() {
         if (input.pausePressed()) {
@@ -168,6 +275,9 @@ public final class Game {
         if (introTimer > 0) {
             introTimer--;
         }
+        if (fadeIn > 0) {
+            fadeIn--;
+        }
         Goal goal = level.goal;
         boolean finished = goal != null && goal.passed;
         if (!player.dead && !finished) {
@@ -177,36 +287,41 @@ public final class Game {
             }
         }
 
+        for (Platform p : level.platforms) {
+            p.update();
+        }
         player.update(finished ? noInput : input, level);
         if (bossActive()) {
             double left = level.bossArenaX * T;
             if (player.x < left) {
-                player.x = left;
-                player.vx = Math.max(0, player.vx);
+                player.pushOutX(left);
             } else if (player.x > left + W - Player.W) {
-                player.x = left + W - Player.W;
-                player.vx = Math.min(0, player.vx);
+                player.pushOutX(left + W - Player.W);
             }
         }
 
         if (player.dead) {
+            if (player.deadTimer == 1) {
+                Sound.vibrate(250);
+            }
             if (player.deadTimer > 110) {
                 loseLife();
                 return;
             }
         } else {
-            if (player.y > H + 40) {
+            if (player.y > level.pixelHeight() + 40) {
                 player.die();
             }
             if (player.touchedSpikes) {
                 hurtPlayer(player.centerX() + player.facing);
             }
             handleCollisions();
+            effects();
         }
 
         for (Enemy e : level.enemies) {
-            if (e.alive) {
-                e.update(level);
+            if (e.alive && Math.abs(e.x - player.x) < W * 1.5) {
+                e.update(level, this);
             }
         }
         for (Spring s : level.springs) {
@@ -215,6 +330,13 @@ public final class Game {
         for (Checkpoint c : level.checkpoints) {
             c.update();
         }
+        for (Monitor m : level.monitors) {
+            m.update();
+            if (m.broken && !m.given && m.popTimer >= 30) {
+                m.given = true;
+                givePowerUp(m);
+            }
+        }
         for (Iterator<Ring> it = lostRings.iterator(); it.hasNext();) {
             Ring r = it.next();
             r.updateLost(level);
@@ -222,9 +344,31 @@ public final class Game {
                 it.remove();
             }
         }
-        particles.removeIf(p -> !p.update());
-        animals.removeIf(a -> !a.update(level));
-        bombs.removeIf(b -> !b.update(this, level));
+        for (Iterator<Particle> it = particles.iterator(); it.hasNext();) {
+            if (!it.next().update()) {
+                it.remove();
+            }
+        }
+        for (Iterator<Animal> it = animals.iterator(); it.hasNext();) {
+            if (!it.next().update(level)) {
+                it.remove();
+            }
+        }
+        for (Iterator<Bomb> it = bombs.iterator(); it.hasNext();) {
+            if (!it.next().update(this, level)) {
+                it.remove();
+            }
+        }
+        for (Iterator<Shot> it = shots.iterator(); it.hasNext();) {
+            if (!it.next().update(level)) {
+                it.remove();
+            }
+        }
+        for (Iterator<Popup> it = popups.iterator(); it.hasNext();) {
+            if (!it.next().update()) {
+                it.remove();
+            }
+        }
         updateBoss();
 
         if (goal != null) {
@@ -246,13 +390,13 @@ public final class Game {
         for (Ring r : level.rings) {
             if (!r.collected && pb.intersects(r.bounds())) {
                 r.collected = true;
-                collectRing(r);
+                collectRing(r.x, r.y);
             }
         }
         for (Ring r : lostRings) {
             if (r.collectable() && pb.intersects(r.bounds())) {
                 r.collected = true;
-                collectRing(r);
+                collectRing(r.x, r.y);
             }
         }
 
@@ -260,12 +404,14 @@ public final class Game {
             if (!e.alive || !pb.intersects(e.bounds())) {
                 continue;
             }
-            boolean stomp = player.vy > 0 && player.bottom() - e.y < 16;
+            boolean stomp = player.vy > 0 && !player.onGround && player.bottom() - e.y < 16;
             if (player.attacking() || stomp) {
                 e.alive = false;
                 player.combo++;
                 int[] values = {100, 200, 500, 1000};
-                score += values[Math.min(player.combo, values.length) - 1];
+                int points = values[Math.min(player.combo, values.length) - 1];
+                score += points;
+                popups.add(new Popup(String.valueOf(points), e.centerX(), e.y - 6));
                 explosion(e.centerX(), e.y + e.h / 2.0, 1);
                 animals.add(new Animal(e.centerX(), e.y + e.h, random.nextInt(100)));
                 Sound.play(Sound.POP);
@@ -275,8 +421,26 @@ public final class Game {
             }
         }
 
+        for (Monitor m : level.monitors) {
+            if (m.broken || !pb.intersects(m.bounds())) {
+                continue;
+            }
+            boolean fromAbove = player.vy > 0 && !player.onGround && player.bottom() - (m.base - Monitor.H) < 14;
+            if (player.attacking() || fromAbove) {
+                m.broken = true;
+                score += 10;
+                explosion(m.centerX(), m.base - Monitor.H / 2.0, 1);
+                Sound.play(Sound.POP);
+                player.bounce(input.jumpHeld());
+            } else if (player.centerX() < m.centerX()) {
+                player.pushOutX(m.x - Player.W);
+            } else {
+                player.pushOutX(m.x + Monitor.W);
+            }
+        }
+
         for (Spring s : level.springs) {
-            if (player.vy >= 0 && pb.intersects(s.bounds())) {
+            if ((player.vy >= 0 || player.onGround) && pb.intersects(s.bounds())) {
                 player.y = s.top() - Player.H;
                 player.launch(Spring.POWER);
                 s.squash = 12;
@@ -301,6 +465,11 @@ public final class Game {
                 hurtPlayer(b.x);
             }
         }
+        for (Shot s : shots) {
+            if (pb.intersects(s.bounds())) {
+                hurtPlayer(s.x);
+            }
+        }
 
         if (boss != null && boss.dangerous() && pb.intersects(boss.bounds())) {
             if (player.attacking()) {
@@ -308,44 +477,112 @@ public final class Game {
                     boss.hits++;
                     boss.flash = 40;
                     score += 100;
+                    shake(10);
                     Sound.play(Sound.BOSS_HIT);
-                    if (boss.hits >= Boss.MAX_HITS) {
+                    Sound.vibrate(40);
+                    if (boss.hits >= boss.maxHits) {
                         boss.defeated = true;
                         score += 1000;
+                        popups.add(new Popup("1000", boss.centerX(), boss.y - 10));
                     }
                 }
-                player.vx = player.centerX() < boss.centerX() ? -4 : 4;
-                player.vy = -5;
+                player.bounceOff(player.centerX() < boss.centerX() ? -1 : 1);
             } else {
                 hurtPlayer(boss.centerX());
             }
         }
     }
 
-    private void collectRing(Ring r) {
+    /** Poussière quand Henry dérape, charge un spin dash ou atterrit vite. */
+    private void effects() {
+        double fx = player.centerX();
+        double fy = player.bottom();
+        if (player.skidding && tick % 3 == 0) {
+            particles.add(new Particle(Particle.DUST, fx - player.facing * 8, fy - 3,
+                    -player.facing * 0.5, -0.6, 22, 0));
+            if (tick % 9 == 0) {
+                Sound.play(Sound.TICK);
+            }
+        }
+        if (player.spinDash && tick % 4 == 0) {
+            particles.add(new Particle(Particle.DUST, fx - player.facing * 14, fy - 4,
+                    -player.facing * 1.8, -0.5, 20, 0));
+        }
+        if (player.landed && player.speed() > 5) {
+            for (int i = -1; i <= 1; i += 2) {
+                particles.add(new Particle(Particle.DUST, fx + i * 8, fy - 3, i * 1.2, -0.4, 18, 0));
+            }
+        }
+        if (player.stars > 0 && tick % 5 == 0) {
+            particles.add(new Particle(Particle.SPARK, fx + random.nextInt(31) - 15,
+                    player.y + random.nextInt(Player.H), 0, -0.5, 18, YELLOW));
+        }
+    }
+
+    private void collectRing(double x, double y) {
         player.rings++;
         Sound.play(Sound.RING);
         for (int i = 0; i < 4; i++) {
             double a = Math.PI / 2 * i + Math.PI / 4;
-            particles.add(new Particle(Particle.SPARK, r.x, r.y, Math.cos(a) * 1.5, Math.sin(a) * 1.5, 14,
+            particles.add(new Particle(Particle.SPARK, x, y, Math.cos(a) * 1.5, Math.sin(a) * 1.5, 14,
                     Col.WHITE));
         }
         if (player.rings >= nextLifeRings) {
             nextLifeRings += 100;
             lives++;
             Sound.play(Sound.ONE_UP);
+            popups.add(new Popup("1 VIE !", player.centerX(), player.y - 10));
         }
     }
 
+    private void givePowerUp(Monitor m) {
+        String text;
+        switch (m.type) {
+            case Monitor.RINGS:
+                for (int i = 0; i < 10; i++) {
+                    collectRing(m.centerX(), m.base - Monitor.H);
+                }
+                text = "+10";
+                break;
+            case Monitor.SHIELD:
+                player.shield = true;
+                Sound.play(Sound.CHECKPOINT);
+                text = "BOUCLIER";
+                break;
+            case Monitor.SHOES:
+                player.shoes = Player.SHOES_TIME;
+                Sound.play(Sound.DASH);
+                text = "VITESSE !";
+                break;
+            case Monitor.STARS:
+                player.stars = Player.STARS_TIME;
+                Sound.play(Sound.ONE_UP);
+                text = "INVINCIBLE !";
+                break;
+            default:
+                lives++;
+                Sound.play(Sound.ONE_UP);
+                text = "1 VIE !";
+                break;
+        }
+        popups.add(new Popup(text, m.centerX(), m.base - Monitor.H - 30));
+    }
+
     private void hurtPlayer(double fromX) {
-        if (player.invuln > 0 || player.dead) {
+        if (player.invuln > 0 || player.dead || player.stars > 0) {
             return;
         }
-        if (player.rings > 0) {
+        if (player.shield) {
+            player.shield = false;
+            player.knockBack(fromX);
+            Sound.play(Sound.BOSS_HIT);
+            Sound.vibrate(50);
+        } else if (player.rings > 0) {
             scatterRings();
             player.rings = 0;
             player.knockBack(fromX);
             Sound.play(Sound.LOSE_RINGS);
+            Sound.vibrate(80);
         } else {
             player.die();
         }
@@ -366,11 +603,18 @@ public final class Game {
     private void loseLife() {
         lives--;
         if (lives <= 0) {
-            bestScore = Math.max(bestScore, score);
+            saveBest();
             state = State.GAME_OVER;
             stateTimer = 0;
         } else {
             startLevel(false);
+        }
+    }
+
+    private void saveBest() {
+        if (score > bestScore) {
+            bestScore = score;
+            storage.putInt("meilleur", bestScore);
         }
     }
 
@@ -383,8 +627,9 @@ public final class Game {
             return;
         }
         double arenaLeft = level.bossArenaX * T;
+        double groundY = level.bossGroundRow * T;
         if (boss == null && !bossDone && player.x > arenaLeft + 48) {
-            boss = new Boss(arenaLeft);
+            boss = new Boss(arenaLeft, groundY, level.zoneIndex);
         }
         if (boss == null) {
             return;
@@ -392,13 +637,23 @@ public final class Game {
         boss.update(this);
         if (boss.defeated && boss.deadTimer > 200 && !bossDone) {
             bossDone = true;
-            level.goal = new Goal(arenaLeft + W - 6 * T, (level.h - 4) * T);
+            level.goal = new Goal(arenaLeft + W - 6 * T, groundY);
             Sound.play(Sound.CHECKPOINT);
         }
     }
 
     void dropBomb(double x, double y) {
         bombs.add(new Bomb(x, y));
+    }
+
+    void shoot(int kind, double x, double y, double vx, double vy) {
+        if (Math.abs(x - player.x) < W) {
+            shots.add(new Shot(kind, x, y, vx, vy));
+        }
+    }
+
+    void shake(int frames) {
+        shake = Math.max(shake, frames);
     }
 
     void explosion(double x, double y, int size) {
@@ -412,23 +667,39 @@ public final class Game {
         }
     }
 
+    // ----------------------------------------------------------------- caméra
+
+    private double targetCamY() {
+        double look = player.lookingUp ? -110 : (player.crouching ? 90 : 0);
+        return player.y + Player.H / 2.0 - H / 2.0 - 20 + look;
+    }
+
     private void updateCamera() {
-        if (bossActive() || bossDone && level.bossArenaX >= 0 && player.x > level.bossArenaX * T) {
-            double target = level.bossArenaX * T;
-            camX += (target - camX) * 0.08;
+        boolean arena = level.bossArenaX >= 0 && (bossActive()
+                || (bossDone && player.x > level.bossArenaX * T));
+        if (arena) {
+            camX += (level.bossArenaX * T - camX) * 0.08;
+            camY += (clampCamY(level.bossGroundRow * T - 400) - camY) * 0.08;
             return;
         }
         if (!player.dead) {
             lead += (Math.max(-100, Math.min(100, player.vx * 12)) - lead) * 0.04;
+            camY += (clampCamY(targetCamY()) - camY) * (player.onGround ? 0.12 : 0.08);
         }
         double target = player.centerX() - W / 2.0 + lead;
         camX += (target - camX) * 0.18;
-        camX = clampCamera(camX);
+        camX = clampCamX(camX);
     }
 
-    private double clampCamera(double v) {
+    private double clampCamX(double v) {
         return Math.max(0, Math.min(level.pixelWidth() - W, v));
     }
+
+    private double clampCamY(double v) {
+        return Math.max(0, Math.min(level.pixelHeight() - H, v));
+    }
+
+    // ----------------------------------------------------------------- fin de niveau
 
     private void enterClear() {
         state = State.CLEAR;
@@ -452,11 +723,30 @@ public final class Game {
             timeBonus = 0;
         }
         ringBonus = player.rings * 100;
+        int next = Math.min(Levels.COUNT - 1, levelIndex + 1);
+        if (next > unlocked) {
+            unlocked = next;
+            storage.putInt("niveau", unlocked);
+        }
     }
 
     private void updateClear() {
         stateTimer++;
         level.goal.update();
+        if (fadeOut > 0) {
+            if (++fadeOut >= FADE) {
+                levelIndex++;
+                if (levelIndex >= Levels.COUNT) {
+                    saveBest();
+                    state = State.VICTORY;
+                    stateTimer = 0;
+                    Sound.play(Sound.ONE_UP);
+                } else {
+                    startLevel(true);
+                }
+            }
+            return;
+        }
         if (stateTimer < 90) {
             return;
         }
@@ -469,7 +759,7 @@ public final class Game {
             if (tick % 4 == 0) {
                 Sound.play(Sound.TICK);
             }
-            if (input.startPressed()) {
+            if (input.startPressed() || input.anyTap()) {
                 score += timeBonus + ringBonus;
                 timeBonus = 0;
                 ringBonus = 0;
@@ -477,16 +767,8 @@ public final class Game {
             stateTimer = 90;
             return;
         }
-        if (stateTimer > 200 || (stateTimer > 100 && input.startPressed())) {
-            levelIndex++;
-            if (levelIndex >= Levels.COUNT) {
-                bestScore = Math.max(bestScore, score);
-                state = State.VICTORY;
-                stateTimer = 0;
-                Sound.play(Sound.ONE_UP);
-            } else {
-                startLevel(true);
-            }
+        if (stateTimer > 200 || (stateTimer > 100 && (input.startPressed() || input.anyTap()))) {
+            fadeOut = 1;
         }
     }
 
@@ -518,82 +800,148 @@ public final class Game {
                     centered(g, touchMode ? "Touche l'écran pour reprendre" : "P ou Échap pour reprendre",
                             16, false, Col.LIGHT_GRAY, H / 2 + 32);
                 }
+                int fade = Math.max(fadeIn, fadeOut);
+                if (fade > 0) {
+                    g.setColor(Col.argb(255 * fade / FADE, 0));
+                    g.fillRect(0, 0, W, H);
+                }
                 break;
         }
     }
 
     private void renderWorld(Gfx g) {
-        renderBackground(g, level.theme, camX);
-        renderTiles(g);
+        double sx = 0;
+        double sy = 0;
+        if (shake > 0) {
+            sx = random.nextInt(7) - 3;
+            sy = random.nextInt(7) - 3;
+        }
+        double cam = camX - sx;
+        double shift = (level.pixelHeight() - H - camY) * 0.25;
+        renderBackground(g, level.theme, cam, shift);
+        g.save();
+        g.translate(0, -Math.round(camY) + sy);
+        renderLiquid(g, cam);
+        for (Loop l : level.loops) {
+            l.draw(g, level.theme, cam);
+        }
+        renderTiles(g, cam);
+        for (Platform p : level.platforms) {
+            p.draw(g, level.theme, cam);
+        }
         for (Checkpoint c : level.checkpoints) {
-            c.draw(g, camX);
+            c.draw(g, cam);
         }
         if (level.goal != null) {
-            level.goal.draw(g, camX);
+            level.goal.draw(g, cam);
         }
         for (Spring s : level.springs) {
             if (visible(s.x, T)) {
-                s.draw(g, camX);
+                s.draw(g, cam);
+            }
+        }
+        for (Monitor m : level.monitors) {
+            if (visible(m.x, Monitor.W)) {
+                m.draw(g, cam, tick);
             }
         }
         for (Ring r : level.rings) {
             if (!r.collected && visible(r.x - Ring.SIZE, Ring.SIZE * 2)) {
-                r.draw(g, camX, tick);
+                r.draw(g, cam, tick);
             }
         }
         for (Ring r : lostRings) {
-            r.draw(g, camX, tick);
+            r.draw(g, cam, tick);
         }
         for (Enemy e : level.enemies) {
             if (e.alive && visible(e.x, e.w)) {
-                e.draw(g, camX);
+                e.draw(g, cam);
             }
         }
         for (Animal a : animals) {
-            a.draw(g, camX);
+            a.draw(g, cam);
         }
         for (Bomb b : bombs) {
-            b.draw(g, camX, tick);
+            b.draw(g, cam, tick);
+        }
+        for (Shot s : shots) {
+            s.draw(g, cam, tick);
         }
         if (boss != null) {
-            boss.draw(g, camX, tick);
+            boss.draw(g, cam, tick);
         }
-        player.draw(g, camX, tick);
+        player.drawTrail(g, cam);
+        player.draw(g, cam, tick);
         for (Particle p : particles) {
-            p.draw(g, camX);
+            p.draw(g, cam);
         }
+        for (Popup p : popups) {
+            p.draw(g, cam);
+        }
+        g.restore();
     }
 
     private boolean visible(double x, double w) {
         return x + w >= camX - 32 && x <= camX + W + 32;
     }
 
-    private void renderTiles(Gfx g) {
+    /** Eau, lave ou liquide toxique tout au fond : visible dans les gouffres. */
+    private void renderLiquid(Gfx g, double cam) {
+        double top = level.pixelHeight() - 72;
+        int color = level.theme.liquid();
+        g.setColor(color);
+        g.fillRect(0, top + 6, W, 80);
+        int n = W / 16 + 2;
+        double[] xs = new double[n + 2];
+        double[] ys = new double[n + 2];
+        double off = cam % 16;
+        for (int i = 0; i < n; i++) {
+            xs[i] = i * 16 - off;
+            ys[i] = top + 3 + Math.sin((i * 16 + cam) * 0.05 + tick * 0.08) * 3;
+        }
+        xs[n] = xs[n - 1];
+        ys[n] = top + 10;
+        xs[n + 1] = xs[0];
+        ys[n + 1] = top + 10;
+        g.fillPolygon(xs, ys, n + 2);
+        g.setColor(Col.argb(120, 0xffffff));
+        for (int i = 0; i < 12; i++) {
+            double x = wrap(i * 97 - cam * 0.9 + Math.sin(tick * 0.03 + i) * 20, W + 60) - 30;
+            g.fillRect(x, top + 16 + (i % 3) * 14, 18 + (i % 4) * 6, 2);
+        }
+    }
+
+    private void renderTiles(Gfx g, double cam) {
         Theme th = level.theme;
-        int cam = (int) Math.round(camX);
-        int x0 = Math.max(0, cam / T);
-        int x1 = Math.min(level.w - 1, (cam + W) / T + 1);
-        for (int ty = 0; ty < level.h; ty++) {
+        int camI = (int) Math.round(cam);
+        int x0 = Math.max(0, camI / T);
+        int x1 = Math.min(level.w - 1, (camI + W) / T + 1);
+        int y0 = Math.max(0, (int) (camY / T));
+        int y1 = Math.min(level.h - 1, (int) ((camY + H) / T) + 1);
+        for (int ty = y0; ty <= y1; ty++) {
             for (int tx = x0; tx <= x1; tx++) {
                 byte t = level.tile(tx, ty);
-                int sx = tx * T - cam;
+                int sx = tx * T - camI;
                 int sy = ty * T;
                 if (t == Level.SOLID) {
-                    boolean top = level.tile(tx, ty - 1) != Level.SOLID;
+                    byte above = level.tile(tx, ty - 1);
+                    boolean top = above == Level.EMPTY || above == Level.ONEWAY || above == Level.SPIKE;
                     g.drawSprite(top ? th.top(g) : th.fill(g), sx, sy);
-                    if (top && level.tile(tx, ty - 1) == Level.EMPTY) {
+                    if (top && above == Level.EMPTY && ty > 0) {
                         decorate(g, th, tx, sx, sy);
                     }
                 } else if (t == Level.ONEWAY) {
                     g.drawSprite(th.platform(g), sx, sy);
                 } else if (t == Level.SPIKE) {
                     g.drawSprite(th.spikes(g), sx, sy);
+                } else if (Level.isSlope(t)) {
+                    g.drawSprite(th.slope(g, t), sx, sy);
                 }
             }
         }
     }
 
-    /** Fleurs, cactus et lampadaires posés sur le sol. */
+    /** Fleurs, palmiers, cactus et lampadaires posés sur le sol. */
     private void decorate(Gfx g, Theme th, int tx, int sx, int sy) {
         int h = hash(tx);
         if (h % 6 != 0) {
@@ -601,13 +949,17 @@ public final class Game {
         }
         int cx = sx + 8 + (h >> 4) % 16;
         if (th.style == Theme.MEADOW) {
+            if ((h >> 9) % 3 == 0) {
+                drawPalm(g, cx, sy, h);
+                return;
+            }
             g.setColor(Col.rgb(0x2b8a3e));
             g.fillRect(cx - 1, sy - 14, 2, 14);
             g.setColor((h >> 8) % 2 == 0 ? Col.rgb(0xffd43b) : Col.rgb(0xf783ac));
             int sway = (int) (Math.sin(tick * 0.05 + tx) * 1.5);
             for (int i = 0; i < 5; i++) {
-                double a = i * Math.PI * 2 / 5;
-                g.fillOval(cx + sway + (int) (Math.cos(a) * 4) - 3, sy - 18 + (int) (Math.sin(a) * 4) - 3, 6, 6);
+                double a = i * Math.PI * 2 / 5 + tick * 0.02;
+                g.fillOval(cx + sway + Math.cos(a) * 4 - 3, sy - 18 + Math.sin(a) * 4 - 3, 6, 6);
             }
             g.setColor(Col.rgb(0x7048e8));
             g.fillOval(cx + sway - 2, sy - 20, 5, 5);
@@ -618,13 +970,45 @@ public final class Game {
             g.fillRect(cx - 9, sy - 11, 6, 3);
             g.fillRoundRect(cx + 6, sy - 22, 6, 10, 6);
             g.fillRect(cx + 3, sy - 15, 6, 3);
+            g.setColor(Col.rgb(0x40c057));
+            g.fillRect(cx - 2, sy - 24, 1, 20);
         } else {
             g.setColor(Col.rgb(0x495057));
             g.fillRect(cx - 2, sy - 40, 4, 40);
             g.fillRect(cx - 2, sy - 40, 12, 3);
-            g.setColor((tick / 30 + tx) % 2 == 0 ? Col.rgb(0xffe066) : Col.rgb(0xffa94d));
+            boolean on = (tick / 30 + tx) % 2 == 0;
+            g.setColor(on ? Col.rgb(0xffe066) : Col.rgb(0xffa94d));
             g.fillOval(cx + 6, sy - 38, 6, 6);
+            if (on) {
+                g.setColor(Col.argb(40, 0xffe066));
+                g.fillPolygon(new double[] {cx + 9, cx - 6, cx + 24}, new double[] {sy - 35, sy, sy}, 3);
+            }
         }
+    }
+
+    private void drawPalm(Gfx g, int cx, int sy, int h) {
+        double sway = Math.sin(tick * 0.03 + h) * 2;
+        g.setColor(Col.rgb(0x8d5a2b));
+        for (int i = 0; i < 6; i++) {
+            g.fillRoundRect(cx - 4 + i * 0.8 + sway * i / 6, sy - 12 - i * 10, 9, 11, 4);
+        }
+        g.setColor(Col.rgb(0x6b4220));
+        for (int i = 0; i < 6; i++) {
+            g.fillRect(cx - 3 + i * 0.8 + sway * i / 6, sy - 3 - i * 10, 7, 2);
+        }
+        double tx = cx + 5 + sway;
+        double ty = sy - 66;
+        g.setColor(Col.rgb(0x2f9e44));
+        for (int i = 0; i < 6; i++) {
+            double a = -Math.PI + i * Math.PI / 5 + Math.sin(tick * 0.04 + i) * 0.05;
+            double ex = tx + Math.cos(a) * 30;
+            double ey = ty + Math.sin(a) * 14 + 12;
+            g.fillPolygon(new double[] {tx, (tx + ex) / 2 + 2, ex, (tx + ex) / 2 - 2},
+                    new double[] {ty, ty - 8 + Math.sin(a) * 6, ey, ty + 6}, 4);
+        }
+        g.setColor(Col.rgb(0x8d5a2b));
+        g.fillOval(tx - 6, ty - 2, 6, 6);
+        g.fillOval(tx, ty, 6, 6);
     }
 
     private static int hash(int v) {
@@ -635,32 +1019,40 @@ public final class Game {
         return h & 0x7fffffff;
     }
 
-    private void renderBackground(Gfx g, Theme th, double cam) {
+    private void renderBackground(Gfx g, Theme th, double cam, double shift) {
         g.fillVerticalGradient(0, 0, W, H, th.skyTop, th.skyBottom);
         if (th.style == Theme.MEADOW) {
+            g.setColor(Col.argb(90, 0xffffff));
+            g.fillOval(600, 20 + shift * 0.2, 140, 140);
             g.setColor(Col.argb(200, 0xffffff));
             for (int i = 0; i < 8; i++) {
                 double cx = wrap(i * 180 - cam * 0.1 - tick * 0.15, W + 200) - 100;
-                int cy = 40 + (hash(i) % 90);
-                g.fillOval((int) cx, cy, 90, 26);
-                g.fillOval((int) cx + 20, cy - 12, 50, 30);
+                double cy = 40 + (hash(i) % 90) + shift * 0.3;
+                g.fillOval(cx, cy, 90, 26);
+                g.fillOval(cx + 20, cy - 12, 50, 30);
             }
-            drawHills(g, cam, 0.2, 300, 50, th.far, 0.006);
-            drawHills(g, cam, 0.4, 350, 35, th.near, 0.011);
+            drawMountains(g, cam, 0.08, 270 + shift * 0.4, Col.rgb(0x91a7ff), Col.rgb(0xe7f5ff));
+            drawHills(g, cam, 0.2, 300 + shift * 0.6, 50, th.far, 0.006);
+            drawHills(g, cam, 0.4, 350 + shift, 35, th.near, 0.011);
         } else if (th.style == Theme.CANYON) {
+            g.setColor(Col.argb(80, 0xfff3bf));
+            g.fillOval(530, 120 + shift * 0.3, 170, 170);
             g.setColor(Col.rgb(0xffe8a3));
-            g.fillOval(560, 150, 110, 110);
-            drawMesas(g, cam, 0.15, 260, th.far);
-            drawMesas(g, cam, 0.35, 330, th.near);
+            g.fillOval(560, 150 + shift * 0.3, 110, 110);
+            drawMesas(g, cam, 0.15, 260 + shift * 0.5, th.far);
+            drawMesas(g, cam, 0.35, 330 + shift, th.near);
         } else {
             g.setColor(Col.WHITE);
             for (int i = 0; i < 60; i++) {
                 int sx = (int) wrap(hash(i) % 1600 - cam * 0.05, W);
-                int sy = hash(i + 99) % 250;
-                g.fillRect(sx, sy, (i % 5 == 0) ? 2 : 1, (i % 5 == 0) ? 2 : 1);
+                double sy = hash(i + 99) % 250 + shift * 0.2;
+                double r = (i % 5 == 0) ? 2 : 1;
+                if ((tick / 20 + i) % 9 != 0) {
+                    g.fillRect(sx, sy, r, r);
+                }
             }
-            drawFactories(g, cam, 0.2, th.far, 230);
-            drawFactories(g, cam, 0.4, th.near, 300);
+            drawFactories(g, cam, 0.2, th.far, 230 + shift * 0.5);
+            drawFactories(g, cam, 0.4, th.near, 300 + shift);
         }
     }
 
@@ -669,7 +1061,21 @@ public final class Game {
         return r < 0 ? r + m : r;
     }
 
-    private void drawHills(Gfx g, double cam, double factor, int base, int amp, int color, double freq) {
+    private void drawMountains(Gfx g, double cam, double factor, double base, int color, int snow) {
+        double off = cam * factor;
+        int first = (int) Math.floor(off / 160) - 1;
+        for (int i = first; i < first + W / 160 + 3; i++) {
+            double x = i * 160 - off;
+            double h = 90 + hash(i * 3) % 70;
+            g.setColor(color);
+            g.fillPolygon(new double[] {x - 40, x + 80, x + 200}, new double[] {base, base - h, base}, 3);
+            g.setColor(snow);
+            g.fillPolygon(new double[] {x + 80 - h * 0.25, x + 80, x + 80 + h * 0.25, x + 80, x + 70},
+                    new double[] {base - h * 0.75, base - h, base - h * 0.75, base - h * 0.7, base - h * 0.78}, 5);
+        }
+    }
+
+    private void drawHills(Gfx g, double cam, double factor, double base, int amp, int color, double freq) {
         int n = W / 8 + 1;
         double[] xs = new double[n + 2];
         double[] ys = new double[n + 2];
@@ -679,7 +1085,7 @@ public final class Game {
             int x = i * 8;
             double wx = x + cam * factor;
             xs[i + 1] = x;
-            ys[i + 1] = (int) (base - Math.abs(Math.sin(wx * freq)) * amp - Math.sin(wx * freq * 2.3) * amp * 0.3);
+            ys[i + 1] = base - Math.abs(Math.sin(wx * freq)) * amp - Math.sin(wx * freq * 2.3) * amp * 0.3;
         }
         xs[n + 1] = W;
         ys[n + 1] = H;
@@ -687,36 +1093,36 @@ public final class Game {
         g.fillPolygon(xs, ys, n + 2);
     }
 
-    private void drawMesas(Gfx g, double cam, double factor, int base, int color) {
+    private void drawMesas(Gfx g, double cam, double factor, double base, int color) {
         g.setColor(color);
         double off = cam * factor;
         int first = (int) Math.floor(off / 80) - 1;
         for (int i = first; i < first + W / 80 + 3; i++) {
             int h = hash(i + (int) (factor * 100)) % 120;
-            int x = (int) (i * 80 - off);
+            double x = i * 80 - off;
             g.fillRect(x, base - h, 82, H);
             g.fillRect(x - 8, base - h, 98, 10);
         }
     }
 
-    private void drawFactories(Gfx g, double cam, double factor, int color, int base) {
+    private void drawFactories(Gfx g, double cam, double factor, int color, double base) {
         double off = cam * factor;
         int first = (int) Math.floor(off / 100) - 1;
         for (int i = first; i < first + W / 100 + 3; i++) {
             int h = 40 + hash(i * 7 + (int) (factor * 10)) % 140;
-            int x = (int) (i * 100 - off);
+            double x = i * 100 - off;
             g.setColor(color);
             g.fillRect(x, base - h, 90, H);
             if (hash(i) % 3 == 0) {
                 g.fillRect(x + 60, base - h - 60, 14, 60);
                 g.setColor(Col.rgba(120, 120, 140, 90));
                 int puff = (tick / 2 + i * 13) % 60;
-                g.fillOval(x + 54 + puff / 3, base - h - 75 - puff, 24 + puff / 3, 18 + puff / 4);
+                g.fillOval(x + 54 + puff / 3.0, base - h - 75 - puff, 24 + puff / 3.0, 18 + puff / 4.0);
             }
             g.setColor(Col.rgb(0xffe066));
-            for (int wy = base - h + 12; wy < base; wy += 22) {
-                for (int wx = x + 10; wx < x + 80; wx += 20) {
-                    if (hash(wx * 31 + wy) % 3 == 0) {
+            for (int wy = (int) (base - h + 12); wy < base; wy += 22) {
+                for (int wx = (int) x + 10; wx < x + 80; wx += 20) {
+                    if (hash((wx - (int) x) * 31 + wy + i * 7) % 3 == 0) {
                         g.fillRect(wx, wy, 8, 8);
                     }
                 }
@@ -728,7 +1134,7 @@ public final class Game {
         int seconds = timeFrames / 60;
         String time = (seconds / 60) + ":" + (seconds % 60 < 10 ? "0" : "") + (seconds % 60);
         hudLine(g, "SCORE", String.valueOf(score), 30, YELLOW);
-        hudLine(g, "TEMPS", time, 56, YELLOW);
+        hudLine(g, "TEMPS", time, 56, timeFrames > TIME_LIMIT - 60 * 60 && (tick / 15) % 2 == 0 ? Col.RED : YELLOW);
         boolean warn = player.rings == 0 && (tick / 15) % 2 == 0;
         hudLine(g, "ANNEAUX", String.valueOf(player.rings), 82, warn ? Col.RED : YELLOW);
 
@@ -746,9 +1152,33 @@ public final class Game {
         g.setFont(16, false);
         shadowText(g, "HENRY", bx + 18, by - 2, YELLOW);
         shadowText(g, "x " + lives, bx + 18, by + 14, Col.WHITE);
+
+        // bonus actifs
+        int px = touchMode ? 120 : 20;
+        int py = 100;
+        if (player.shield) {
+            powerIcon(g, px, py, Monitor.SHIELD, 1);
+            px += 34;
+        }
+        if (player.shoes > 0) {
+            powerIcon(g, px, py, Monitor.SHOES, player.shoes / (double) Player.SHOES_TIME);
+            px += 34;
+        }
+        if (player.stars > 0) {
+            powerIcon(g, px, py, Monitor.STARS, player.stars / (double) Player.STARS_TIME);
+        }
         if (!Sound.isEnabled() && !touchMode) {
+            g.setFont(16, false);
             shadowText(g, "SON COUPÉ", W - 110, H - 10, Col.WHITE);
         }
+    }
+
+    private void powerIcon(Gfx g, int x, int y, int type, double left) {
+        g.setColor(Col.argb(140, 0));
+        g.fillRoundRect(x, y, 28, 28, 8);
+        new Monitor(0, 0, type).drawIcon(g, x + 14, y + 13, tick);
+        g.setColor(YELLOW);
+        g.fillRect(x + 3, y + 24, 22 * left, 2);
     }
 
     private void hudLine(Gfx g, String label, String value, int y, int labelColor) {
@@ -764,7 +1194,7 @@ public final class Game {
         g.drawText(s, x, y);
     }
 
-    private static void centered(Gfx g, String s, float size, boolean italic, int c, int y) {
+    private static void centered(Gfx g, String s, float size, boolean italic, int c, double y) {
         g.setFont(size, italic);
         shadowText(g, s, (W - g.textWidth(s)) / 2, y, c);
     }
@@ -777,6 +1207,9 @@ public final class Game {
         int bandX = (int) (-260 + 260 * k);
         g.setColor(Col.rgb(0x1c7ed6));
         g.fillPolygon(new double[] {bandX, bandX + 220, bandX + 160, bandX}, new double[] {0, 0, H, H}, 4);
+        g.setColor(Col.rgb(0xe03131));
+        g.fillPolygon(new double[] {bandX + 200, bandX + 230, bandX + 170, bandX + 140},
+                new double[] {0, 0, H, H}, 4);
         g.setColor(YELLOW);
         g.fillRect(0, (int) (H - 90 * k), W, 14);
         int tx = (int) (W / 2.0 + 60 + (1 - k) * W);
@@ -784,7 +1217,8 @@ public final class Game {
         float zw = g.textWidth(level.zone);
         shadowText(g, level.zone, tx - zw / 2, 210, Col.WHITE);
         g.setFont(20, true);
-        shadowText(g, "ACTE " + level.act, tx + zw / 2 - g.textWidth("ACTE 1"), 250, YELLOW);
+        String act = "ACTE " + level.act;
+        shadowText(g, act, tx + zw / 2 - g.textWidth(act), 250, YELLOW);
     }
 
     private void renderClear(Gfx g) {
@@ -793,10 +1227,18 @@ public final class Game {
         g.setColor(Col.argb(110, 0));
         g.fillRoundRect(190, 105, 420, 235, 30);
         g.setFont(32, true);
-        String title = levelIndex == Levels.COUNT - 1 ? "HENRY A SAUVÉ LE MONDE !" : "HENRY A RÉUSSI !";
+        String title;
+        if (levelIndex == Levels.COUNT - 1) {
+            title = "HENRY A SAUVÉ LE MONDE !";
+        } else if (level.bossArenaX >= 0) {
+            title = "DR. VORTEX EST EN FUITE !";
+        } else {
+            title = "HENRY A RÉUSSI !";
+        }
         shadowText(g, title, (W - g.textWidth(title)) / 2 - off, 150, Col.WHITE);
         g.setFont(20, true);
-        shadowText(g, level.zone, (W - g.textWidth(level.zone)) / 2 + off, 185, YELLOW);
+        String sub = level.zone + " - ACTE " + level.act;
+        shadowText(g, sub, (W - g.textWidth(sub)) / 2 + off, 185, YELLOW);
         if (stateTimer >= 30) {
             row(g, "SCORE", score, 250);
             row(g, "BONUS TEMPS", timeBonus, 285);
@@ -814,46 +1256,78 @@ public final class Game {
     private void renderTitle(Gfx g) {
         double cam = tick * 4;
         Theme th = Theme.PRAIRIE;
-        renderBackground(g, th, cam);
-        int ground = 380;
+        renderBackground(g, th, cam, 0);
+        int ground = 400;
         int off = (int) (cam % T);
         for (int x = -off; x < W; x += T) {
             g.drawSprite(th.top(g), x, ground);
             g.drawSprite(th.fill(g), x, ground + T);
             g.drawSprite(th.fill(g), x, ground + 2 * T);
-            g.drawSprite(th.fill(g), x, ground + 3 * T);
         }
-        titleHenry.x = W / 2.0 - Player.W / 2.0;
+        titleHenry.x = 660 - Player.W / 2.0;
         titleHenry.y = ground - Player.H;
         g.save();
-        g.translate(W / 2.0, ground);
-        g.scale(2, 2);
-        g.translate(-W / 2.0, -ground);
+        g.translate(660, ground);
+        g.scale(1.6, 1.6);
+        g.translate(-660, -ground);
         titleHenry.draw(g, 0, tick);
         g.restore();
 
         // logo
         int bob = (int) (Math.sin(tick * 0.05) * 4);
+        g.setColor(Col.argb(90, 0));
+        g.fillRoundRect(178, 34 + bob + 8, 460, 150, 60);
         g.setColor(Col.rgb(0x1c2f8a));
-        g.fillRoundRect(170, 40 + bob, 460, 150, 60);
+        g.fillRoundRect(170, 34 + bob, 460, 150, 60);
+        g.setColor(Col.rgb(0x364fc7));
+        g.fillRoundRect(176, 40 + bob, 448, 70, 50);
         g.setColor(YELLOW);
         g.setStroke(5f);
-        g.drawRoundRect(170, 40 + bob, 460, 150, 60);
+        g.drawRoundRect(170, 34 + bob, 460, 150, 60);
         g.setStroke(1f);
-        centered(g, "HENRY", 84, true, Col.WHITE, 125 + bob);
-        centered(g, "LE HÉRISSON", 32, true, YELLOW, 170 + bob);
-
-        if ((tick / 30) % 2 == 0) {
-            centered(g, touchMode ? "TOUCHE L'ÉCRAN POUR JOUER" : "APPUIE SUR ENTRÉE", 20, true, Col.WHITE, 235);
+        for (int i = 0; i < 3; i++) {
+            double a = tick * 0.04 + i * 2.1;
+            g.setColor(Col.argb(200, 0xffffff));
+            Monitor.star(g, 400 + Math.cos(a) * 215, 109 + bob + Math.sin(a) * 70, 6, 2.5);
         }
-        g.setColor(Col.argb(120, 0));
-        g.fillRoundRect(110, 250, 580, 20, 10);
+        centered(g, "HENRY", 84, true, Col.WHITE, 119 + bob);
+        centered(g, "LE HÉRISSON", 32, true, YELLOW, 164 + bob);
+
+        // menu
+        String[] items = {
+            "JOUER",
+            unlocked > 0 ? "◀  " + Levels.zoneName(menuLevel).replace("ZONE ", "") + " " + (menuLevel % 2 + 1) + "  ▶"
+                    : "ZONES : finis un acte pour les débloquer",
+            "SON : " + (Sound.isEnabled() ? "OUI" : "NON"),
+        };
+        double mx = (W - MENU_W) / 2.0;
+        for (int i = 0; i < items.length; i++) {
+            double my = MENU_Y + i * MENU_GAP;
+            boolean sel = i == menuIndex;
+            g.setColor(sel ? Col.argb(170, 0x1c2f8a) : Col.argb(110, 0));
+            g.fillRoundRect(mx, my - 26, MENU_W, 34, 16);
+            if (sel) {
+                g.setColor(YELLOW);
+                g.setStroke(2f);
+                g.drawRoundRect(mx, my - 26, MENU_W, 34, 16);
+                g.setStroke(1f);
+            }
+            float size = i == 1 ? 17 : 22;
+            int color = sel ? YELLOW : Col.WHITE;
+            if (i == 1 && unlocked == 0) {
+                size = 14;
+                color = Col.LIGHT_GRAY;
+            }
+            centered(g, items[i], size, true, color, my - (22 - size) / 2);
+        }
+        g.setColor(Col.argb(130, 0));
+        g.fillRect(0, H - 26, W, 26);
         centered(g, touchMode
-                ? "◀ ▶ : courir    A : sauter    ▼ : rouler    ▼ + A : spin dash"
-                : "←/→ ou Q/D : courir   ESPACE : sauter   ↓ : rouler   ↓+ESPACE : spin dash",
-                13, false, Col.WHITE, 265);
+                ? "Touche un choix  •  ◀ ▶ courir   A sauter   ▼ rouler   ▼ + A spin dash"
+                : "↑↓ choisir  Entrée valider  •  ←→ courir  Espace sauter  ↓ rouler  ↓+Espace spin dash",
+                13, false, Col.WHITE, H - 8);
         if (bestScore > 0) {
-            centered(g, "MEILLEUR SCORE : " + bestScore, 16, false, YELLOW, 22);
+            centered(g, "MEILLEUR SCORE : " + bestScore, 15, false, YELLOW, 22);
         }
     }
 
@@ -872,13 +1346,21 @@ public final class Game {
     }
 
     private void renderVictory(Gfx g) {
-        renderBackground(g, Theme.PRAIRIE, tick);
-        centered(g, "BRAVO HENRY !", 64, true, YELLOW, 150);
-        centered(g, "Le Dr. Vortex est vaincu et les animaux sont libres !", 20, true, Col.WHITE, 210);
-        centered(g, "Score final : " + score, 32, true, Col.WHITE, 280);
+        renderBackground(g, Theme.PRAIRIE, tick, 0);
+        for (int i = 0; i < 12; i++) {
+            double x = wrap(i * 70 + tick * (1 + i % 3), W + 40) - 20;
+            double y = 360 - Math.abs(Math.sin(tick * 0.08 + i)) * 50;
+            new Animal(x, y, i).draw(g, 0);
+        }
+        centered(g, "BRAVO HENRY !", 64, true, YELLOW, 130);
+        centered(g, "Le Dr. Vortex est vaincu et les animaux sont libres !", 20, true, Col.WHITE, 185);
+        centered(g, "Score final : " + score, 32, true, Col.WHITE, 245);
+        if (score >= bestScore && score > 0) {
+            centered(g, "NOUVEAU RECORD !", 20, true, YELLOW, 280);
+        }
         if (stateTimer > 60) {
             centered(g, touchMode ? "Touche l'écran pour revenir au titre" : "Entrée pour revenir au titre",
-                    16, false, Col.WHITE, 340);
+                    16, false, Col.WHITE, 330);
         }
     }
 }

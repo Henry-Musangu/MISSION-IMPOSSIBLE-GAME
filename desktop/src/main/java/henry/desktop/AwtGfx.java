@@ -7,6 +7,7 @@ import java.awt.Font;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.Shape;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Arc2D;
 import java.awt.geom.Ellipse2D;
@@ -29,8 +30,12 @@ public final class AwtGfx implements Gfx {
         }
     }
 
+    /** Marqueur « pas de découpe » (une pile ne peut pas contenir null). */
+    private static final Shape NO_CLIP = new Rectangle2D.Double();
+
     private final Graphics2D g;
     private final Deque<AffineTransform> stack = new ArrayDeque<>();
+    private final Deque<Shape> clips = new ArrayDeque<>();
     private final Font[] fontCache = new Font[2];
 
     public AwtGfx(Graphics2D g) {
@@ -137,13 +142,22 @@ public final class AwtGfx implements Gfx {
     }
 
     @Override
+    public void clipPolygon(double[] xs, double[] ys, int n) {
+        g.clip(path(xs, ys, n));
+    }
+
+    @Override
     public void save() {
         stack.push(g.getTransform());
+        Shape clip = g.getClip();
+        clips.push(clip == null ? NO_CLIP : clip);
     }
 
     @Override
     public void restore() {
         g.setTransform(stack.pop());
+        Shape clip = clips.pop();
+        g.setClip(clip == NO_CLIP ? null : clip);
     }
 
     @Override

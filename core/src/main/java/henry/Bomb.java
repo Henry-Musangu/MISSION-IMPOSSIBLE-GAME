@@ -20,7 +20,7 @@ final class Bomb {
         }
         vy = Math.min(vy + 0.25, 9);
         y += vy;
-        if (level.tile(Level.toTile(x), Level.toTile(y + 8)) != Level.EMPTY || y > Game.H) {
+        if (level.tile(Level.toTile(x), Level.toTile(y + 8)) != Level.EMPTY || y > level.pixelHeight()) {
             blast = 26;
             game.explosion(x, y, 4);
             Sound.play(Sound.BOOM);

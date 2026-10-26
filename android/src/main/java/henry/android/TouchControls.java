@@ -77,8 +77,12 @@ final class TouchControls {
         return best;
     }
 
-    /** Traduit les doigts posés sur l'écran en boutons du jeu. */
-    synchronized void onTouch(MotionEvent e, Game game) {
+    /**
+     * Traduit les doigts posés sur l'écran en boutons du jeu. Hors partie (menus),
+     * un toucher est transmis au jeu avec sa position ({@code ox}, {@code oy}, {@code scale} :
+     * placement de l'image du jeu dans l'écran).
+     */
+    synchronized void onTouch(MotionEvent e, Game game, float ox, float oy, float scale) {
         boolean playing = game.isPlaying() && !game.isPaused();
         int action = e.getActionMasked();
         Input in = game.input;
@@ -92,8 +96,8 @@ final class TouchControls {
                 in.tap(Input.MUTE);
             } else if (game.isPaused()) {
                 in.tap(Input.PAUSE);
-            } else if (!game.isPlaying()) {
-                in.tap(Input.START);
+            } else if (!game.isPlaying() && scale > 0) {
+                in.tapAt((e.getX(i) - ox) / scale, (e.getY(i) - oy) / scale);
             }
         }
 

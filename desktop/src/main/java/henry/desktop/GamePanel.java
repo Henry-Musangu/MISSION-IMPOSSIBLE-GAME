@@ -39,7 +39,7 @@ final class GamePanel extends JPanel {
         KEYS[Input.MUTE] = new int[] {KeyEvent.VK_M};
     }
 
-    private final transient Game game = new Game();
+    private final transient Game game = new Game(false, new PrefsStorage());
     private final transient BufferedImage frame = new BufferedImage(Game.W, Game.H, BufferedImage.TYPE_INT_RGB);
     private final boolean[] keys = new boolean[1024];
     private long last;

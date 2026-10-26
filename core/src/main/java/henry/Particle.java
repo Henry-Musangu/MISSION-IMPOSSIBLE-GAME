@@ -6,6 +6,7 @@ final class Particle {
     static final int SPARK = 0;
     static final int BOOM = 1;
     static final int DEBRIS = 2;
+    static final int DUST = 3;
 
     final int kind;
     double x;
@@ -32,6 +33,9 @@ final class Particle {
         y += vy;
         if (kind == DEBRIS) {
             vy += 0.3;
+        } else if (kind == DUST) {
+            vx *= 0.92;
+            vy *= 0.92;
         }
         return --life > 0;
     }
@@ -54,6 +58,10 @@ final class Particle {
             g.fillOval(sx - r, sy - r, r * 2, r * 2);
             g.setColor(Col.argb(alpha, 0xff7828));
             g.fillOval(sx - r / 2, sy - r / 2, r, r);
+        } else if (kind == DUST) {
+            double r = 3 + 7 * (1 - k);
+            g.setColor(Col.argb((int) (150 * k), 0xf1f3f5));
+            g.fillOval(sx - r, sy - r, 2 * r, 2 * r);
         } else {
             g.setColor(color);
             g.fillRect(sx - 2, sy - 2, 5, 5);
