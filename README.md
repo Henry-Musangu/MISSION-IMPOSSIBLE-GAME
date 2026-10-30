@@ -1,3 +1,7 @@
+> **Nouveau : NEW YORK LIFE — Open World**, jeu 3D en monde ouvert à New York pour Android.
+> APK : https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/download/newyorklife/new-york-life.apk
+> — détails dans [`newyorklife/README.md`](newyorklife/README.md).
+
 # Henry le Hérisson
 
 Un jeu de plateforme rapide inspiré de *Sonic the Hedgehog*, écrit en **Java**, pour **PC** et **Android**.
