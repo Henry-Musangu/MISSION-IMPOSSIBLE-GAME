@@ -47,7 +47,7 @@ func setup(p_type: String, p_color: Color) -> void:
 	contact_monitor = true
 	max_contacts_reported = 4
 	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
-	center_of_mass = Vector3(0, float(spec["wheel_r"]) + 0.15, 0.1)
+	center_of_mass = Vector3(0, float(spec["wheel_r"]) * 0.55, 0.05)
 	can_sleep = true
 	linear_damp = 0.05
 	angular_damp = 0.6
@@ -83,7 +83,7 @@ func setup(p_type: String, p_color: Color) -> void:
 		w.damping_compression = 2.2
 		w.damping_relaxation = 3.2
 		w.wheel_friction_slip = spec["grip"]
-		w.wheel_roll_influence = 0.06
+		w.wheel_roll_influence = 0.03
 		var front := i < 2
 		w.use_as_steering = front
 		w.use_as_traction = (not front) or spec["drive"] == "awd"

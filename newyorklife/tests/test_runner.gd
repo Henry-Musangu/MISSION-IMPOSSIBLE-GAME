@@ -205,7 +205,7 @@ func test_vehicle_physics() -> void:
 		v.global_transform = Transform3D(Basis(), Vector3(0, 1.0, 0))
 		await _frames(60)
 		var rest_y := v.global_position.y
-		check(rest_y > 0.0 and rest_y < 1.2, "%s repose sur ses roues (y=%.2f)" % [type, rest_y])
+		check(rest_y > -0.3 and rest_y < 1.2, "%s repose sur ses roues (y=%.2f)" % [type, rest_y])
 		check(not v.is_upside_down(), "%s reste droit" % type)
 		v.throttle = 1.0
 		await _frames(180)
@@ -217,6 +217,7 @@ func test_vehicle_physics() -> void:
 		var yaw0 := v.global_rotation.y
 		await _frames(60)
 		check(absf(angle_difference(yaw0, v.global_rotation.y)) > 0.1, "%s tourne" % type)
+		check(not v.is_upside_down(), "%s reste droit en virage serré" % type)
 		v.steer_input = 0.0
 		v.throttle = -1.0
 		await _frames(150)

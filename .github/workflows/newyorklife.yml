@@ -62,6 +62,7 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" tests.log; then exit 1; fi
 
       - name: Test de jeu complet (rendu OpenGL logiciel) et captures
+        if: success() || failure()
         run: |
           set -o pipefail
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0 > /dev/null
