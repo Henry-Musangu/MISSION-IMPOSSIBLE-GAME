@@ -49,16 +49,10 @@ jobs:
           godot --headless --path newyorklife --import 2>&1 | tee import.log || true
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|SHADER ERROR" import.log; then exit 1; fi
 
-      - name: Vérifier la syntaxe de tous les scripts
+      - name: Vérifier la compilation de tous les scripts
         run: |
-          fail=0
-          for f in $(cd newyorklife && find scripts tests -name "*.gd"); do
-            out=$(godot --headless --path newyorklife --check-only --script "res://$f" 2>&1) || true
-            if echo "$out" | grep -qE "SCRIPT ERROR|Parse Error|ERROR"; then
-              echo "=== $f"; echo "$out" | grep -E "ERROR|at:" | head -20; fail=1
-            fi
-          done
-          exit $fail
+          godot --headless --path newyorklife res://tests/check_scripts.tscn 2>&1 | tee check.log || true
+          grep -q "CHECK RESULT: .* 0 en erreur" check.log
 
       - name: Tests automatisés
         run: |
