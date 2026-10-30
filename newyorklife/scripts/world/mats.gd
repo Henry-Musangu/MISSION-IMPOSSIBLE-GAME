@@ -30,6 +30,9 @@ void fragment() {
 	float my = mix(0.26, 0.1, curtain);
 	float upper = step(4.4, UV.y);
 	float win = step(mx, f.x) * step(f.x, 1.0 - mx) * step(my, f.y) * step(f.y, 1.0 - my * 0.5) * upper * facade;
+	// au loin, les fenêtres deviennent une teinte moyenne (évite le scintillement)
+	float aa = clamp(1.6 - length(fwidth(cell)) * 2.5, 0.0, 1.0);
+	win = mix(0.45 * upper * facade, win, aa);
 	float sx = UV.x / 5.0;
 	float sf = fract(sx);
 	float shop = step(0.08, sf) * step(sf, 0.92) * step(0.35, UV.y) * step(UV.y, 3.3) * (1.0 - upper) * facade;
@@ -46,9 +49,9 @@ void fragment() {
 	ALBEDO = col;
 	ROUGHNESS = clamp(mix(0.88, 0.18, win + shop) - wet * 0.25, 0.05, 1.0);
 	METALLIC = win * 0.2;
-	float lit = step(0.52 - night * 0.12, rnd) * win * night;
+	float lit = step(0.66, rnd) * win * night;
 	vec3 warm = mix(vec3(1.0, 0.8, 0.52), vec3(0.72, 0.84, 1.0), step(0.86, rnd));
-	EMISSION = warm * lit * 1.4 + vec3(1.0, 0.88, 0.68) * shop * (0.18 + night * 1.2) + band_col * band * night * 0.9;
+	EMISSION = warm * lit * 0.85 + vec3(1.0, 0.88, 0.68) * shop * (0.1 + night * 0.55) + band_col * band * night * 0.6;
 }
 """
 

@@ -20,17 +20,17 @@ var show_fps := false
 const PROFILES := {
 	Quality.LOW: {
 		"render_scale": 0.7, "shadows": false, "shadow_size": 1024, "msaa": 0,
-		"view_distance": 230.0, "fog_density": 0.006, "traffic": 7, "pedestrians": 10,
+		"view_distance": 230.0, "fog_density": 0.0035, "traffic": 7, "pedestrians": 10,
 		"stream_radius": 190.0, "rain_particles": 250, "detail_range": 70.0,
 	},
 	Quality.MEDIUM: {
 		"render_scale": 0.85, "shadows": true, "shadow_size": 1024, "msaa": 0,
-		"view_distance": 320.0, "fog_density": 0.0042, "traffic": 12, "pedestrians": 18,
+		"view_distance": 320.0, "fog_density": 0.0022, "traffic": 12, "pedestrians": 18,
 		"stream_radius": 260.0, "rain_particles": 500, "detail_range": 110.0,
 	},
 	Quality.HIGH: {
 		"render_scale": 1.0, "shadows": true, "shadow_size": 2048, "msaa": 2,
-		"view_distance": 450.0, "fog_density": 0.003, "traffic": 18, "pedestrians": 28,
+		"view_distance": 450.0, "fog_density": 0.0015, "traffic": 18, "pedestrians": 28,
 		"stream_radius": 380.0, "rain_particles": 900, "detail_range": 160.0,
 	},
 }

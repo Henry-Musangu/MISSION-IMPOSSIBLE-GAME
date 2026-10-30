@@ -49,6 +49,14 @@ func _build_ground() -> void:
 	mi.name = "Ground"
 	mi.mesh = MeshUtil.commit(st, Mats.ground())
 	add_child(mi)
+	# Fleuves autour de l'île
+	var wst := MeshUtil.begin()
+	MeshUtil.add_ground_rect(wst, Rect2(mn - Vector2(1500, 1500), (mx - mn) + Vector2(3000, 3000)), -0.6, Color(0.12, 0.2, 0.26))
+	var water := MeshInstance3D.new()
+	water.name = "Water"
+	water.mesh = MeshUtil.commit(wst, Mats.vcolor(0.15, 0.3))
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(water)
 	var body := StaticBody3D.new()
 	body.name = "GroundBody"
 	var cs := CollisionShape3D.new()

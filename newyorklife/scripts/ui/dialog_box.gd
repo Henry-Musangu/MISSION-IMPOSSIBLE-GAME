@@ -21,7 +21,7 @@ var auto_advance := false     ## test automatique : valide tout sans attendre
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme = UITheme.get_theme()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false

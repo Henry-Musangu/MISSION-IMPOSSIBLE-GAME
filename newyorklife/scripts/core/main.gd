@@ -115,7 +115,7 @@ func _build_ui() -> void:
 	touch = TouchControls.new()
 	layer.add_child(touch)
 	_cutscene_layer = Control.new()
-	_cutscene_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_cutscene_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_cutscene_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_cutscene_layer.visible = false
 	layer.add_child(_cutscene_layer)
@@ -159,7 +159,7 @@ func _build_ui() -> void:
 	top_layer.add_child(menus)
 	_fade = ColorRect.new()
 	_fade.color = Color(0, 0, 0, 0)
-	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_layer.add_child(_fade)
 
@@ -521,7 +521,7 @@ func _cleanup_vehicles() -> void:
 func _update_streaming() -> void:
 	if city == null:
 		return
-	var p := player.focus_position() if state == "play" or state == "pause" else camera.global_position
+	var p := player.focus_position() if (state == "play" or state == "pause") and not camera.cinematic else camera.global_position
 	var radius: float = Settings.get_value("stream_radius")
 	for i in city.blocks.size():
 		var node: Node3D = city.blocks[i]
@@ -712,7 +712,23 @@ func _run_smoke_test() -> void:
 	hud.visible = true
 	await _wait(0.3)
 	await _shot("hud")
+	# 11) Conduite de nuit vue de la caméra de jeu
+	GameState.time_minutes = 21 * 60 + 30
+	var car2 := spawn_vehicle("taxi", Color(0.98, 0.76, 0.05), Vector3(L.ave_x(2) - 2.2, 0.0, L.st_z(1) + 15.0), 0.0)
+	await _wait(0.5)
+	player.enter_vehicle(car2)
+	camera.yaw = PI
+	InputState.set_touch_button("gas", true)
+	await _wait(2.5)
+	InputState.set_touch_button("gas", false)
+	await _shot("drive_night")
+	player.exit_vehicle()
+	GameState.time_minutes = 15 * 60
 	results.append("fps=%d" % Engine.get_frames_per_second())
+	# 12) Écran d'accueil
+	show_menu()
+	await _wait(0.6)
+	await _shot("menu")
 	for r in results:
 		print("SMOKE ", r)
 	print("SMOKE RESULT: ", "PASS" if ok else "FAIL")

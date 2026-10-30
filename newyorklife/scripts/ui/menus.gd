@@ -11,7 +11,7 @@ var _map: Minimap
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme = UITheme.get_theme()
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -27,7 +27,7 @@ func show_screen(screen: String) -> void:
 	if screen == "":
 		return
 	_root = Control.new()
-	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
 	match screen:
@@ -49,7 +49,7 @@ func current() -> String:
 func _dim(alpha := 0.55) -> void:
 	var bg := ColorRect.new()
 	bg.color = Color(0, 0, 0, alpha)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_root.add_child(bg)
 
 
@@ -86,7 +86,7 @@ func _build_main() -> void:
 	_from = "main"
 	var shade := ColorRect.new()
 	shade.color = Color(0, 0, 0, 0.35)
-	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_root.add_child(shade)
 	var left := VBoxContainer.new()
 	left.anchor_top = 0.0
@@ -175,7 +175,7 @@ func _build_pause() -> void:
 func _build_map() -> void:
 	_dim(0.75)
 	var holder := PanelContainer.new()
-	holder.set_anchors_preset(Control.PRESET_FULL_RECT)
+	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	holder.offset_left = 40
 	holder.offset_right = -40
 	holder.offset_top = 30
