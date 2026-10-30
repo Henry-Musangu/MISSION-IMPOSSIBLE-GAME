@@ -19,7 +19,8 @@ float hash21(vec2 p) {
 
 void fragment() {
 	vec3 base = COLOR.rgb;
-	float seed = COLOR.a;
+	// graine entière (évite l'amplification des erreurs d'interpolation par le hachage)
+	float seed = floor(COLOR.a * 255.0 + 0.5);
 	float facade = UV2.x;
 	float curtain = UV2.y;
 	vec2 cs = mix(vec2(3.0, 3.5), vec2(1.6, 3.5), curtain);
@@ -37,11 +38,11 @@ void fragment() {
 	float sf = fract(sx);
 	float shop = step(0.08, sf) * step(sf, 0.92) * step(0.35, UV.y) * step(UV.y, 3.3) * (1.0 - upper) * facade;
 	float band = step(3.5, UV.y) * step(UV.y, 4.3) * (1.0 - upper) * facade;
-	float rnd = hash21(id + vec2(seed * 97.0, seed * 31.0));
-	float shop_rnd = hash21(vec2(floor(sx), seed * 53.0));
+	float rnd = hash21(id + vec2(seed * 7.0, seed * 3.0));
+	float shop_rnd = hash21(vec2(floor(sx), seed * 5.0));
 	vec3 glass = mix(vec3(0.16, 0.21, 0.29), vec3(0.42, 0.52, 0.63), rnd * 0.6 + curtain * 0.3);
 	vec3 band_col = vec3(0.2 + shop_rnd * 0.6, 0.15 + fract(shop_rnd * 7.0) * 0.5, 0.12 + fract(shop_rnd * 13.0) * 0.45);
-	float grain = hash21(floor(UV * 2.0) + vec2(seed)) * 0.07;
+	float grain = hash21(floor(UV * 2.0) + vec2(seed * 11.0)) * 0.07;
 	vec3 col = base * (1.0 - grain);
 	col = mix(col, glass, win);
 	col = mix(col, vec3(0.1, 0.11, 0.13), shop);
@@ -60,7 +61,7 @@ shader_type spatial;
 render_mode unshaded, cull_back;
 
 void fragment() {
-	float seed = COLOR.a * 10.0;
+	float seed = floor(COLOR.a * 255.0 + 0.5) * 0.37;
 	vec2 uv = UV;
 	float t = TIME * 0.6 + seed;
 	float stripes = 0.5 + 0.5 * sin(uv.x * 1.3 + t * 2.0 + sin(uv.y * 0.8 + t));

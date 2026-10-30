@@ -13,8 +13,8 @@ const PALETTE := [
 	Color(0.84, 0.82, 0.77), Color(0.62, 0.45, 0.33), Color(0.47, 0.5, 0.55),
 ]
 const CURTAIN_COLOR := Color(0.26, 0.33, 0.42)
-const SIDEWALK_COLOR := Color(0.62, 0.61, 0.58)
-const CURB_COLOR := Color(0.72, 0.71, 0.68)
+const SIDEWALK_COLOR := Color(0.5, 0.49, 0.47)
+const CURB_COLOR := Color(0.6, 0.59, 0.56)
 const ASPHALT := Color(0.2, 0.2, 0.22)
 const ROOF := Color(0.24, 0.24, 0.25)
 

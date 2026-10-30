@@ -148,11 +148,11 @@ func _process(delta: float) -> void:
 	sky_mat.sun_angle_max = 30.0
 	var sun_col := Color(1.0, 0.95, 0.88).lerp(Color(1.0, 0.6, 0.35), sunset)
 	sun.light_color = sun_col
-	sun.light_energy = (daylight * 1.35) * (1.0 - _cloud * 0.5) + _flash * 2.0
+	sun.light_energy = (daylight * 1.1) * (1.0 - _cloud * 0.5) + _flash * 2.0
 	sun.visible = daylight > 0.01 or _flash > 0.0
 	var amb_day := Color(0.78, 0.78, 0.8).lerp(Color(0.95, 0.75, 0.6), sunset * 0.5)
 	env.ambient_light_color = Color(0.3, 0.34, 0.48).lerp(amb_day, daylight)
-	env.ambient_light_energy = lerpf(0.55, 0.6, daylight) * (1.0 + _cloud * 0.25) + _flash
+	env.ambient_light_energy = lerpf(0.55, 0.5, daylight) * (1.0 + _cloud * 0.25) + _flash
 	env.fog_light_color = hor
 	env.fog_density = Settings.get_value("fog_density") * (1.0 + _cloud * 0.6 + _rain_amount * 0.8 + _fog_extra * 6.0)
 	env.fog_light_color = hor.lerp(Color(0.05, 0.06, 0.1), night_factor * 0.5)
