@@ -3,7 +3,7 @@ extends Node
 ## Pilote une voiture de police (Vehicle) : suit la grille de rues vers le joueur,
 ## puis le poursuit directement à courte distance ; se dégage s'il est bloqué.
 
-const L := CityLayout
+const L = preload("res://scripts/world/city_layout.gd")
 
 var car: Vehicle
 var player: Player

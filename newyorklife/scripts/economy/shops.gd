@@ -3,7 +3,7 @@ extends Node3D
 ## Commerces et services : concession, garage, boutique, appartement, métro,
 ## station-service, hôpital. Points d'interaction (marqueurs bleus) sur les trottoirs.
 
-const L := CityLayout
+const L = preload("res://scripts/world/city_layout.gd")
 const SHOP_COLOR := Color(0.25, 0.6, 1.0)
 const REPAINT_PRICE := 150
 const METRO_PRICE := 3

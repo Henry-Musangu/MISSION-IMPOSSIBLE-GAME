@@ -3,7 +3,7 @@ extends Node3D
 ## Pool d'habitants autour du joueur, mise à jour à cadence réduite pour les plus lointains,
 ## détection des collisions avec le véhicule du joueur.
 
-const L := CityLayout
+const L = preload("res://scripts/world/city_layout.gd")
 
 var player: Player
 var peds: Array[Pedestrian] = []

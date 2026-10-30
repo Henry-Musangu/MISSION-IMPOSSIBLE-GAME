@@ -3,7 +3,7 @@ extends Control
 ## Mini-carte (orientée selon la caméra) et carte complète (nord en haut).
 ## Dessinée à partir du plan de la ville : aucun rendu 3D supplémentaire.
 
-const L := CityLayout
+const L = preload("res://scripts/world/city_layout.gd")
 
 var world: Node
 var full := false

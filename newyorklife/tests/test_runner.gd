@@ -3,7 +3,7 @@ extends Node
 ## économie, sauvegarde, localisation, données de missions, physique du véhicule
 ## et déplacement du personnage. Code de sortie 0 = tout est passé.
 
-const L := CityLayout
+const L = preload("res://scripts/world/city_layout.gd")
 
 var _passed := 0
 var _failed := 0

@@ -4,7 +4,7 @@ extends Node3D
 ## 4 intervention renforcée (barrages), 5 recherche intensive.
 ## Le niveau retombe si le joueur reste hors de vue des policiers assez longtemps.
 
-const L := CityLayout
+const L = preload("res://scripts/world/city_layout.gd")
 const MAX_LEVEL := 5
 
 var player: Player

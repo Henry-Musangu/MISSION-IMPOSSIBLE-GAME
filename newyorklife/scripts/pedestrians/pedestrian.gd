@@ -3,7 +3,7 @@ extends Node3D
 ## Habitant : marche sur les trottoirs autour de son bloc, s'arrête, discute,
 ## entre dans les commerces puis ressort, fuit le danger, peut être renversé.
 
-const L := CityLayout
+const L = preload("res://scripts/world/city_layout.gd")
 
 enum State { WALK, IDLE, INSIDE, FLEE, KNOCKED, PARK }
 

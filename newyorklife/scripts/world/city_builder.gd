@@ -5,7 +5,7 @@ extends Node3D
 ## Chaque bloc est un nœud autonome (maillage fusionné + collisions) que le
 ## SectorManager active ou désactive selon la distance au joueur.
 
-const L := CityLayout
+const L = preload("res://scripts/world/city_layout.gd")
 
 const PALETTE := [
 	Color(0.55, 0.27, 0.2), Color(0.42, 0.22, 0.17), Color(0.78, 0.72, 0.6),

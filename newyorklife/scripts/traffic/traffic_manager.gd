@@ -3,7 +3,7 @@ extends Node3D
 ## Gère un groupe de véhicules IA autour du joueur (pool réutilisé).
 ## Les véhicules trop éloignés sont replacés sur une voie proche, hors de la vue.
 
-const L := CityLayout
+const L = preload("res://scripts/world/city_layout.gd")
 
 var player: Player
 var cars: Array[TrafficCar] = []

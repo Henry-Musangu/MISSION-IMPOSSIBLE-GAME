@@ -3,7 +3,7 @@ extends Node
 ## les interactions du joueur, l'arrestation, l'hôpital, la sauvegarde automatique
 ## et le chargement progressif des secteurs de la ville.
 
-const L := CityLayout
+const L = preload("res://scripts/world/city_layout.gd")
 const AUTOSAVE_INTERVAL := 120.0
 
 var world_root: Node3D

@@ -3,7 +3,7 @@ extends AnimatableBody3D
 ## Véhicule de circulation piloté par l'IA (cinématique, peu coûteux) :
 ## suit les voies, respecte les feux, freine derrière les obstacles, tourne aux intersections.
 
-const L := CityLayout
+const L = preload("res://scripts/world/city_layout.gd")
 
 var type := "sedan"
 var color := Color.WHITE

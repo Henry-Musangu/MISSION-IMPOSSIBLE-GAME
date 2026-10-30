@@ -3,7 +3,7 @@ extends Node3D
 ## Exécute les missions définies dans MissionDefs, étape par étape.
 ## Les systèmes centraux ne connaissent pas les missions : tout passe par Events.
 
-const L := CityLayout
+const L = preload("res://scripts/world/city_layout.gd")
 const GIVER_COLOR := Color(1.0, 0.78, 0.15)
 const TARGET_COLOR := Color(0.3, 0.85, 1.0)
 
