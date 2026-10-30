@@ -10,3 +10,7 @@ local.properties
 *.iml
 .vscode/
 .DS_Store
+# Godot (New York Life)
+newyorklife/.godot/
+newyorklife/**/*.uid
+newyorklife/build/
