@@ -53,7 +53,7 @@ jobs:
         run: |
           fail=0
           for f in $(cd newyorklife && find scripts tests -name "*.gd"); do
-            out=$(godot --headless --path newyorklife --check-only --script "res://$f" 2>&1)
+            out=$(godot --headless --path newyorklife --check-only --script "res://$f" 2>&1) || true
             if echo "$out" | grep -qE "SCRIPT ERROR|Parse Error|ERROR"; then
               echo "=== $f"; echo "$out" | grep -E "ERROR|at:" | head -20; fail=1
             fi
