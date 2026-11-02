@@ -44,15 +44,18 @@ jobs:
       - name: Préparer le projet Android (autorisations GPS, icône, écran de démarrage)
         run: bash scripts/prepare-android.sh
 
-      - name: Utiliser la clé de signature fixe (mises à jour sans désinstaller)
-        run: mkdir -p ~/.android && cp keystore/debug.keystore ~/.android/debug.keystore
-
       - name: Compiler l'APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
           cp app/build/outputs/apk/debug/app-debug.apk ../protocole-clarisse-john.apk
+
+      - name: Vérifier la signature fixe (mises à jour sans désinstaller)
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs protocole-clarisse-john.apk | tee certs.txt
+          grep -qi "SHA-256 digest: e2ba4a99a354ccdf746d9df0c3b4f258c41098cb4d31880272206c62e8e56cbf" certs.txt
 
       - uses: actions/upload-artifact@v4
         with:
