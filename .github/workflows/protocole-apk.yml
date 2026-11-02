@@ -1,0 +1,72 @@
+# Compile l'APK Android de l'application du protocole (Clarisse & John) à chaque modification
+# du dossier protocole-mariage/, puis le publie dans la Release « protocole » :
+# https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/download/protocole/protocole-clarisse-john.apk
+name: APK Protocole C&J
+
+on:
+  push:
+    paths:
+      - 'protocole-mariage/**'
+      - '.github/workflows/protocole-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: protocole-mariage
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: protocole-mariage/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Construire l'application
+        run: npm run build
+
+      - name: Préparer le projet Android (autorisations GPS, icône, écran de démarrage)
+        run: bash scripts/prepare-android.sh
+
+      - name: Utiliser la clé de signature fixe (mises à jour sans désinstaller)
+        run: mkdir -p ~/.android && cp keystore/debug.keystore ~/.android/debug.keystore
+
+      - name: Compiler l'APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk ../protocole-clarisse-john.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: protocole-clarisse-john-apk
+          path: protocole-mariage/protocole-clarisse-john.apk
+
+      - name: Publier l'APK dans la Release « protocole »
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view protocole >/dev/null 2>&1; then
+            gh release upload protocole protocole-clarisse-john.apk --clobber
+          else
+            gh release create protocole protocole-clarisse-john.apk --target "$GITHUB_SHA" --latest=false \
+              --title "Protocole Clarisse & John pour Android" \
+              --notes "Téléchargez protocole-clarisse-john.apk sur le téléphone et ouvrez-le pour installer l'application du protocole. Le fichier est remplacé automatiquement à chaque mise à jour."
+          fi

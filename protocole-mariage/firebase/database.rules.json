@@ -1,0 +1,27 @@
+{
+  "rules": {
+    "adminpass": {
+      "$team": {
+        ".read": false,
+        ".write": "auth != null && (!data.exists() || root.child('adminclaims').child($team).child(auth.uid).exists())"
+      }
+    },
+    "adminclaims": {
+      "$team": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.isString() && root.child('adminpass').child($team).child(newData.val()).exists()"
+        }
+      }
+    },
+    "equipes": {
+      "$team": {
+        ".read": "auth != null",
+        "$coll": {
+          ".write": "auth != null && (!($coll === 'invites' || $coll === 'tables' || $coll === 'membres' || $coll === 'departements' || $coll === 'programme' || $coll === 'annonces' || $coll === 'etat' || $coll === 'reglages') || root.child('adminclaims').child($team).child(auth.uid).exists())"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr" data-skin="noir">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0D0A0B">
+<meta name="color-scheme" content="dark light">
+<title>Protocole Clarisse & John</title>
+<link rel="icon" href="img/icon-192.png">
+<link rel="stylesheet" href="app.css">
+<script>try{var s=localStorage.getItem("pj.skin");s=s?JSON.parse(s):"noir";if(s==="auto")s=matchMedia("(prefers-color-scheme: light)").matches?"blanc":"noir";document.documentElement.dataset.skin=s}catch(e){}</script>
+</head>
+<body>
+<header class="top pad">
+  <div class="top-in">
+    <a class="mono" href="#accueil" aria-label="Accueil">C<span>&amp;</span>J</a>
+    <div class="top-t" id="top-t">Protocole</div>
+    <span class="sync" id="sync"><i></i><span></span></span>
+    <button class="icon-btn me-btn" id="me-btn" data-act="me" aria-label="Choisir mon nom">?</button>
+    <button class="icon-btn" data-act="menu" aria-label="Menu" id="menu-btn"></button>
+  </div>
+</header>
+<div id="banner"></div>
+<main id="view"></main>
+<nav class="nav pad" aria-label="Navigation principale"><div class="nav-in" id="nav"></div></nav>
+<div id="sheet" hidden></div>
+<div id="lb" hidden></div>
+<div id="toast" hidden role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>

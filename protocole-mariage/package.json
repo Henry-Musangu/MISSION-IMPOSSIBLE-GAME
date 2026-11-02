@@ -1,0 +1,26 @@
+{
+  "name": "protocole-clarisse-john",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Application du protocole du mariage de Clarisse & John (Android, Capacitor)",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "android:prepare": "bash scripts/prepare-android.sh"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/geolocation": "8.2.4",
+    "@fontsource/cormorant-garamond": "5.2.8",
+    "@fontsource/jost": "5.2.8",
+    "@fontsource/pinyon-script": "5.2.8",
+    "firebase": "12.19.0",
+    "leaflet": "1.9.4"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.3",
+    "esbuild": "0.28.2"
+  }
+}
