@@ -19,3 +19,9 @@ rootProject.name = 'HenryLeHerisson'
 include ':core'
 include ':app'
 project(':app').projectDir = file('android')
+
+// Agenda personnel : cœur partagé (agenda/core) et application Android (agenda/android)
+include ':agenda-core'
+project(':agenda-core').projectDir = file('agenda/core')
+include ':agenda-app'
+project(':agenda-app').projectDir = file('agenda/android')

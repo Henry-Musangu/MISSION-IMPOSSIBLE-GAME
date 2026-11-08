@@ -1,6 +1,7 @@
-# Compile automatiquement l'APK Android (et vérifie la version PC) à chaque envoi sur GitHub,
-# puis le publie dans la Release « android » : lien direct à ouvrir depuis le téléphone
-# https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/latest/download/henry-le-herisson.apk
+# Compile automatiquement les APK Android (et vérifie les versions PC) à chaque envoi sur GitHub,
+# puis les publie dans des Releases : liens directs à ouvrir depuis le téléphone
+# Jeu :    https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/latest/download/henry-le-herisson.apk
+# Agenda : https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/download/agenda/agenda.apk
 name: APK Android
 
 on:
@@ -28,16 +29,29 @@ jobs:
           mkdir -p out
           javac -encoding UTF-8 -d out core/src/main/java/henry/*.java desktop/src/main/java/henry/desktop/*.java
 
-      - name: Compiler l'APK Android
+      - name: Compiler et tester l'agenda (version PC)
+        run: |
+          mkdir -p out/agenda out/agenda-tests
+          javac -encoding UTF-8 -d out/agenda agenda/core/src/main/java/agenda/*.java agenda/desktop/src/main/java/agenda/desktop/*.java
+          javac -encoding UTF-8 -d out/agenda-tests agenda/core/src/main/java/agenda/*.java agenda/core/src/test/java/agenda/*.java
+          java -cp out/agenda-tests agenda.AgendaTests
+
+      - name: Compiler les APK Android
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon :app:assembleDebug
+          ./gradlew --no-daemon :app:assembleDebug :agenda-app:assembleDebug
           cp android/build/outputs/apk/debug/app-debug.apk henry-le-herisson.apk
+          cp agenda/android/build/outputs/apk/debug/agenda-app-debug.apk agenda.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: henry-le-herisson-apk
           path: henry-le-herisson.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agenda-apk
+          path: agenda.apk
 
       - name: Publier l'APK dans la Release « android »
         env:
@@ -49,4 +63,16 @@ jobs:
             gh release create android henry-le-herisson.apk --target "$GITHUB_SHA" --latest \
               --title "Henry le Hérisson pour Android" \
               --notes "Télécharge henry-le-herisson.apk sur ton téléphone et ouvre-le pour installer le jeu. Ce fichier est remplacé automatiquement à chaque mise à jour du code."
+          fi
+
+      - name: Publier l'APK de l'agenda dans la Release « agenda »
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view agenda >/dev/null 2>&1; then
+            gh release upload agenda agenda.apk --clobber
+          else
+            gh release create agenda agenda.apk --target "$GITHUB_SHA" --latest=false \
+              --title "Agenda pour Android" \
+              --notes "Télécharge agenda.apk sur ton téléphone et ouvre-le pour installer l'agenda. Ce fichier est remplacé automatiquement à chaque mise à jour du code ; il s'installe par-dessus l'ancienne version sans perdre tes événements."
           fi
