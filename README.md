@@ -1,5 +1,10 @@
 # Henry le Hérisson
 
+> **Aussi dans ce dépôt : [Henry Agenda](agenda/README.md)**, l'agenda personnel pour Android
+> (tâches avec rappel, relevé d'activités par période en PDF, répétitions, recherche, import / export .ics).
+> APK : https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/download/agenda/agenda.apk
+> — sur PC : `agenda.bat` (Windows) ou `./agenda.sh`.
+
 Un jeu de plateforme rapide inspiré de *Sonic the Hedgehog*, écrit en **Java**, pour **PC** et **Android**.
 Aucune bibliothèque externe ni fichier d'image ou de son : tout est dessiné et synthétisé par le code.
 
