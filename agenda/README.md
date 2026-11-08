@@ -1,9 +1,17 @@
-# Agenda
+# Henry Agenda
 
-Un agenda personnel pour **PC** et **Android**, écrit en **Java**, sans aucune bibliothèque externe.
-Les deux versions partagent le même cœur (`agenda/core`) et le même format de fichier.
+L'agenda personnel d'Henry Musangu, avec son logo **HM**, pour **Android** (une version PC existe aussi).
+Écrit en **Java**, sans aucune bibliothèque externe.
 
 **Fonctions :**
+
+- **tâches à faire** : un titre, une date et une heure, et l'application **rappelle** la tâche par une
+  notification à l'heure dite (ou avant, au choix). On la coche **« Fait ✓ »** dans la liste ou directement
+  depuis la notification ; les tâches oubliées s'affichent en rouge dans **« En retard »** ;
+- **relevé d'activités** sur la période voulue (aujourd'hui, semaine, mois, mois dernier, 3 mois, année,
+  ou dates au choix), présenté comme un relevé bancaire : en-tête avec le logo et le nom, chiffres clés
+  (activités, rendez-vous, tâches faites, en retard), répartition par catégorie, puis le détail ligne par
+  ligne (date, libellé, durée, état, numéro) et les totaux. **Enregistrable en PDF** ou imprimable ;
 
 - vues **Mois**, **Semaine**, **Jour** et **Liste** des prochains événements (sur Android : mois + programme du jour, et liste) ;
 - événements à heure fixe, **sur la journée entière** ou **sur plusieurs jours** ;
@@ -25,7 +33,7 @@ Depuis le téléphone, ouvre ce lien :
 
 **https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/download/agenda/agenda.apk**
 
-puis ouvre le fichier téléchargé et autorise l'installation depuis le navigateur. L'icône « Agenda » apparaît.
+puis ouvre le fichier téléchargé et autorise l'installation depuis le navigateur. L'icône « Henry Agenda » apparaît.
 Au premier lancement, accepte les **notifications** : c'est ce qui permet les rappels.
 
 L'APK est recompilé à chaque envoi de code sur GitHub (Release « agenda »). Il est toujours signé avec la même
@@ -42,9 +50,11 @@ Avec Android Studio ou le SDK Android : `./gradlew :agenda-app:assembleDebug`
 | Toucher un jour | Voir le programme de ce jour sous le calendrier |
 | Glisser vers la gauche / la droite | Mois suivant / précédent |
 | Appui long sur un jour | Nouvel événement ce jour-là |
-| Bouton rond **+** | Nouvel événement |
-| Toucher un événement | Le modifier ou le supprimer |
-| Menu ⋮ | Vue liste, événement sur la journée, importer / exporter un fichier .ics |
+| Bouton rond **+** (ou appui long) | Nouvelle **tâche**, nouvel événement, ou événement sur la journée |
+| Toucher le rond devant une tâche | La cocher « faite » (ou la décocher) |
+| Toucher un événement ou une tâche | Le modifier ou le supprimer |
+| Menu ⋮ → **Relevé d'activités** | Choisir la période ; bouton **PDF** pour l'enregistrer |
+| Menu ⋮ | Vue liste, importer / exporter un fichier .ics, mon nom (en tête des relevés) |
 | Loupe | Rechercher |
 
 Ouvrir un fichier `.ics` reçu (pièce jointe, gestionnaire de fichiers) propose de l'importer dans l'agenda.
@@ -89,10 +99,12 @@ Un événement déjà présent (même identifiant) est remplacé, pas dupliqué.
 | `core/.../Event.java`, `Recurrence.java`, `Category.java` | Un événement, sa règle de répétition, sa catégorie |
 | `core/.../Agenda.java` | Les événements : occurrences d'une période, rappels, recherche, modification d'une occurrence |
 | `core/.../Ics.java`, `AgendaFile.java` | Lecture / écriture du format .ics, enregistrement sûr du fichier |
+| `core/.../Statement.java` | Le relevé d'activités d'une période : lignes, états, totaux |
 | `core/.../Fmt.java`, `DayLayout.java` | Dates en français ; placement des événements qui se chevauchent |
 | `core/src/test/.../AgendaTests.java` | Tests du cœur |
 | `desktop/` | Version PC (Swing) : fenêtre, vues mois / semaine / jour / liste, formulaire, rappels |
-| `android/` | Version Android : écran principal, formulaire, notifications et alarmes |
+| `android/` | Version Android : écran principal, formulaire, relevé (écran + PDF), notifications et alarmes |
+| `android/src/main/res/drawable-nodpi/logo.png` | Le logo HM (icône, barre du haut, notifications, relevés) |
 
 Lancer les tests :
 

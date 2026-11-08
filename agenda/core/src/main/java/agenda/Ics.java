@@ -72,6 +72,19 @@ public final class Ics {
             if (!isBlank(e.location)) w.line("LOCATION:" + text(e.location));
             if (!isBlank(e.notes)) w.line("DESCRIPTION:" + text(e.notes));
             w.line("CATEGORIES:" + text(e.category.label));
+            if (e.task) {
+                w.line("X-HENRY-TASK:TRUE");
+                if (!e.done.isEmpty()) {
+                    StringBuilder sb = new StringBuilder("X-HENRY-DONE:");
+                    boolean first = true;
+                    for (LocalDate d : e.done) {
+                        if (!first) sb.append(',');
+                        sb.append(date(d));
+                        first = false;
+                    }
+                    w.line(sb.toString());
+                }
+            }
             if (e.recurrence != null) {
                 w.line("RRULE:" + rrule(e));
                 for (LocalDate d : e.exdates) {
@@ -246,6 +259,7 @@ public final class Ics {
                             cur.recurrence = rule;
                         }
                         if (cur.recurrence == null) cur.exdates.clear();
+                        if (!cur.task) cur.done.clear();
                         if (alarmMinutes != Integer.MIN_VALUE) cur.reminder = Math.max(0, alarmMinutes);
                         if (recurrenceId != null) {
                             overrideDates.put(cur, recurrenceId);
@@ -307,6 +321,13 @@ public final class Ics {
                     break;
                 }
                 case "STATUS": isCancelled = p.value.trim().equalsIgnoreCase("CANCELLED"); break;
+                case "X-HENRY-TASK": cur.task = p.value.trim().equalsIgnoreCase("TRUE"); break;
+                case "X-HENRY-DONE":
+                    for (String part : p.value.split(",")) {
+                        Stamp s = parseStamp(part, p.params);
+                        if (s != null) cur.done.add(s.time.toLocalDate());
+                    }
+                    break;
                 default: break;
             }
         }

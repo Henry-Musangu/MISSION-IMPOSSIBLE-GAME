@@ -121,10 +121,13 @@ final class Reminders {
         int id = r.key().hashCode();
         PendingIntent pi = PendingIntent.getActivity(c, id, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
+        boolean task = r.occurrence.event.task;
+        if (task) text = "Tâche à faire · " + text;
         Notification.Builder b = new Notification.Builder(c, CHANNEL)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setColor(r.occurrence.event.category.color)
-                .setContentTitle(r.occurrence.event.displayTitle())
+                .setLargeIcon(android.graphics.drawable.Icon.createWithResource(c, R.drawable.logo))
+                .setColor(Ui.BRAND)
+                .setContentTitle((task ? "✓ " : "") + r.occurrence.event.displayTitle())
                 .setContentText(text)
                 .setStyle(new Notification.BigTextStyle().bigText(
                         r.occurrence.event.notes.trim().isEmpty() ? text : text + "\n" + r.occurrence.event.notes.trim()))
@@ -133,6 +136,16 @@ final class Reminders {
                 .setShowWhen(true)
                 .setAutoCancel(true)
                 .setContentIntent(pi);
+        if (task) {
+            Intent doneIntent = new Intent(c, DoneReceiver.class);
+            doneIntent.putExtra(DoneReceiver.EXTRA_UID, r.occurrence.event.uid);
+            doneIntent.putExtra(DoneReceiver.EXTRA_DATE, d.toEpochDay());
+            doneIntent.putExtra(DoneReceiver.EXTRA_NOTIFICATION, id);
+            PendingIntent donePi = PendingIntent.getBroadcast(c, id, doneIntent,
+                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+            b.addAction(new Notification.Action.Builder(
+                    android.graphics.drawable.Icon.createWithResource(c, R.drawable.ic_notification), "Fait ✓", donePi).build());
+        }
         c.getSystemService(NotificationManager.class).notify(id, b.build());
     }
 }

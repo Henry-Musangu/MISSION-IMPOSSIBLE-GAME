@@ -37,6 +37,8 @@ public final class AgendaTests {
         icsImportForeign();
         dayLayout();
         describe();
+        tasks();
+        statement();
         System.out.println(run + " vérifications, " + failed + " échec(s)");
         if (failed > 0) System.exit(1);
     }
@@ -423,6 +425,73 @@ public final class AgendaTests {
         eq(2, slots.get(0).columns, "groupe de 2 colonnes");
         eq(1, slots.get(3).columns, "D seul");
         eq(9 * 60, slots.get(0).startMinute(day), "minutes depuis minuit");
+    }
+
+    private static void tasks() {
+        Agenda a = new Agenda();
+        Event t = Event.task("Payer la facture", t(2026, 11, 10, 9, 0));
+        a.add(t);
+        Event loyer = Event.task("Loyer", t(2026, 11, 1, 8, 0));
+        loyer.recurrence = new Recurrence(Recurrence.Freq.MONTHLY);
+        loyer.reminder = 60;
+        a.add(loyer);
+        eq(t(2026, 11, 10, 9, 0), a.nextReminderTime(t(2026, 11, 2, 0, 0)), "rappel à l'heure de la tâche");
+        a.setDone(t, d(2026, 11, 10), true);
+        eq(t(2026, 12, 1, 7, 0), a.nextReminderTime(t(2026, 11, 2, 0, 0)), "plus de rappel pour une tâche faite");
+        check(a.on(d(2026, 11, 10)).get(0).isDone(), "tâche faite");
+        // en retard : le loyer de novembre n'est pas payé
+        List<Occurrence> late = a.overdue(t(2026, 11, 20, 12, 0), 60);
+        eq(1, late.size(), "une tâche en retard");
+        eq(d(2026, 11, 1), late.get(0).date(), "celle du 1er novembre");
+        a.setDone(loyer, d(2026, 11, 1), true);
+        check(a.overdue(t(2026, 11, 20, 12, 0), 60).isEmpty(), "plus rien en retard");
+        check(!a.on(d(2026, 12, 1)).get(0).isDone(), "décembre reste à faire");
+        // modifier « celle-ci uniquement » garde l'état fait
+        Event moved = loyer.copy();
+        moved.start = t(2026, 11, 2, 8, 0);
+        moved.end = moved.start;
+        Event saved = a.applyEdit(loyer, d(2026, 11, 1), moved, Agenda.Scope.THIS);
+        check(saved.isDone(d(2026, 11, 2)), "la copie détachée reste faite");
+        check(!loyer.done.contains(d(2026, 11, 1)), "la série oublie cette date");
+        // aller-retour .ics
+        List<Event> back = Ics.read(Ics.write(a.events()));
+        Event t2 = null;
+        for (Event e : back) if (e.title.equals("Payer la facture")) t2 = e;
+        check(t2 != null && t2.task, "tâche relue");
+        check(t2 != null && t2.isDone(d(2026, 11, 10)), "état fait relu");
+    }
+
+    private static void statement() {
+        Agenda a = new Agenda();
+        Event r = new Event("Réunion", t(2026, 11, 2, 9, 0), t(2026, 11, 2, 10, 30));
+        r.category = Category.TRAVAIL;
+        r.recurrence = new Recurrence(Recurrence.Freq.WEEKLY);
+        a.add(r);
+        Event t1 = Event.task("Rapport", t(2026, 11, 5, 17, 0));
+        t1.category = Category.TRAVAIL;
+        a.add(t1);
+        a.setDone(t1, d(2026, 11, 5), true);
+        a.add(Event.task("Banque", t(2026, 11, 6, 10, 0)));
+        a.add(Event.task("Courses", t(2026, 11, 20, 10, 0)));
+        a.add(Event.allDay("Congé", d(2026, 11, 11), d(2026, 11, 11)));
+        a.add(new Event("Hors période", t(2026, 12, 2, 9, 0), t(2026, 12, 2, 10, 0)));
+        Statement st = Statement.build(a, d(2026, 11, 1), d(2026, 11, 30), t(2026, 11, 8, 12, 0));
+        eq(5 + 3 + 1, st.lines.size(), "5 réunions + 3 tâches + 1 congé");
+        eq(6, st.appointments, "rendez-vous");
+        eq(3, st.tasks, "tâches");
+        eq(1, st.done, "faites");
+        eq(1, st.overdue, "en retard");
+        eq(1, st.todo, "à faire");
+        eq(5 * 90L, st.minutes, "7 h 30 de réunions");
+        eq("7 h 30", Statement.duration(st.minutes), "durée affichée");
+        eq(50, st.completionRate(), "taux de réalisation");
+        eq(Integer.valueOf(6), st.countByCategory.get(Category.TRAVAIL), "par catégorie");
+        eq(Statement.Status.PAST, st.lines.get(0).status, "première réunion passée");
+        eq(Statement.Status.DONE, st.lines.get(1).status, "rapport fait");
+        eq(Statement.Status.OVERDUE, st.lines.get(2).status, "banque en retard");
+        eq(Statement.Status.UPCOMING, st.lines.get(3).status, "réunion du 9 à venir");
+        eq(9, st.lines.get(8).number, "numérotation");
+        eq("du 1er au 30 novembre 2026", st.periodLabel(), "période");
     }
 
     private static void describe() {

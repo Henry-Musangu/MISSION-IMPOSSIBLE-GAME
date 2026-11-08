@@ -29,6 +29,10 @@ public final class Event {
     public final TreeSet<LocalDate> exdates = new TreeSet<LocalDate>();
     /** Rappel : nombre de minutes avant le début, ou -1 pour aucun rappel. */
     public int reminder = -1;
+    /** Une tâche à faire (plutôt qu'un rendez-vous) : elle peut être cochée « faite ». */
+    public boolean task;
+    /** Pour une tâche : les dates des occurrences déjà faites. */
+    public final TreeSet<LocalDate> done = new TreeSet<LocalDate>();
 
     public Event() {
     }
@@ -64,11 +68,26 @@ public final class Event {
         e.recurrence = recurrence == null ? null : recurrence.copy();
         e.exdates.addAll(exdates);
         e.reminder = reminder;
+        e.task = task;
+        e.done.addAll(done);
         return e;
     }
 
     public Duration duration() {
         return end.isBefore(start) ? Duration.ZERO : Duration.between(start, end);
+    }
+
+    /** Nouvelle tâche à faire le {@code when} (sans durée). */
+    public static Event task(String title, LocalDateTime when) {
+        Event e = new Event(title, when, when);
+        e.task = true;
+        e.reminder = 0;
+        return e;
+    }
+
+    /** La tâche de ce jour est-elle faite ? */
+    public boolean isDone(LocalDate date) {
+        return task && done.contains(date);
     }
 
     public boolean isRecurring() {

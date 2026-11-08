@@ -1,7 +1,7 @@
 # Henry le Hérisson
 
-> **Aussi dans ce dépôt : [Agenda](agenda/README.md)**, un agenda personnel pour PC et Android
-> (mois, semaine, jour, répétitions, rappels, recherche, import / export .ics).
+> **Aussi dans ce dépôt : [Henry Agenda](agenda/README.md)**, l'agenda personnel pour Android
+> (tâches avec rappel, relevé d'activités par période en PDF, répétitions, recherche, import / export .ics).
 > APK : https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/download/agenda/agenda.apk
 > — sur PC : `agenda.bat` (Windows) ou `./agenda.sh`.
 

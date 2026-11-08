@@ -310,7 +310,7 @@ public final class Agenda {
         List<Reminder> out = new ArrayList<Reminder>();
         if (!upTo.isAfter(after)) return out;
         for (Occurrence o : occurrences(after, upTo.plusMinutes(MAX_REMINDER + 1))) {
-            if (o.event.reminder < 0) continue;
+            if (o.event.reminder < 0 || o.isDone()) continue;
             LocalDateTime t = o.start.minusMinutes(o.event.reminder);
             if (t.isAfter(after) && !t.isAfter(upTo)) out.add(new Reminder(o, t));
         }
@@ -323,7 +323,7 @@ public final class Agenda {
         LocalDateTime best = null;
         for (int days : new int[] {2, 32, 370}) {
             for (Occurrence o : occurrences(after, after.plusDays(days))) {
-                if (o.event.reminder < 0) continue;
+                if (o.event.reminder < 0 || o.isDone()) continue;
                 LocalDateTime t = o.start.minusMinutes(o.event.reminder);
                 if (t.isAfter(after) && (best == null || t.isBefore(best))) best = t;
             }
@@ -332,6 +332,29 @@ public final class Agenda {
             if (best != null && best.isBefore(after.plusDays(days).minusMinutes(MAX_REMINDER))) return best;
         }
         return best;
+    }
+
+    // ------------------------------------------------------------------ tâches
+
+    /** Coche ou décoche une tâche (l'occurrence du jour {@code date}). */
+    public void setDone(Event e, LocalDate date, boolean value) {
+        synchronized (this) {
+            if (value) e.done.add(date); else e.done.remove(date);
+        }
+        changed();
+    }
+
+    /** Les tâches pas faites des {@code days} derniers jours dont l'heure est passée, de la plus ancienne à la plus récente. */
+    public List<Occurrence> overdue(LocalDateTime now, int days) {
+        List<Occurrence> out = new ArrayList<Occurrence>();
+        for (Event e : events()) {
+            if (e.task) expand(e, now.minusDays(days), now, out);
+        }
+        for (Iterator<Occurrence> it = out.iterator(); it.hasNext(); ) {
+            if (!it.next().isOverdue(now)) it.remove();
+        }
+        Collections.sort(out, START_ORDER);
+        return out;
     }
 
     // ------------------------------------------------------------------ modifications d'événements répétés
@@ -352,9 +375,13 @@ public final class Agenda {
         switch (scope) {
             case THIS: {
                 original.exdates.add(date);
+                original.done.remove(date);
+                boolean wasDone = edited.done.contains(date);
                 edited.uid = Event.newUid();
                 edited.recurrence = null;
                 edited.exdates.clear();
+                edited.done.clear();
+                if (wasDone && edited.task) edited.done.add(edited.start.toLocalDate());
                 synchronized (this) {
                     int i = findIndex(original.uid);
                     if (i >= 0 && !hasOccurrences(original)) events.remove(i);
@@ -374,6 +401,9 @@ public final class Agenda {
                 for (Iterator<LocalDate> it = edited.exdates.iterator(); it.hasNext(); ) {
                     if (it.next().isBefore(date)) it.remove();
                 }
+                for (Iterator<LocalDate> it = edited.done.iterator(); it.hasNext(); ) {
+                    if (it.next().isBefore(date)) it.remove();
+                }
                 synchronized (this) {
                     events.add(edited);
                 }
@@ -389,6 +419,13 @@ public final class Agenda {
                     Duration shift = Duration.between(occStart, edited.start);
                     edited.start = original.start.plus(shift);
                     edited.end = edited.start.plus(length);
+                    long days = edited.start.toLocalDate().toEpochDay() - original.start.toLocalDate().toEpochDay();
+                    if (days != 0) {
+                        java.util.TreeSet<LocalDate> moved = new java.util.TreeSet<LocalDate>();
+                        for (LocalDate d : edited.done) moved.add(d.plusDays(days));
+                        edited.done.clear();
+                        edited.done.addAll(moved);
+                    }
                 }
                 edited.uid = original.uid;
                 update(edited);
@@ -423,6 +460,9 @@ public final class Agenda {
         e.recurrence.until = date.minusDays(1);
         e.recurrence.count = 0;
         for (Iterator<LocalDate> it = e.exdates.iterator(); it.hasNext(); ) {
+            if (!it.next().isBefore(date)) it.remove();
+        }
+        for (Iterator<LocalDate> it = e.done.iterator(); it.hasNext(); ) {
             if (!it.next().isBefore(date)) it.remove();
         }
     }

@@ -94,7 +94,15 @@ public class MainActivity extends Activity implements MonthView.Listener {
         list.setClipToPadding(false);
         list.setPadding(0, 0, 0, Ui.dp(this, 96));
         list.setSelector(android.R.color.transparent);
-        adapter = new RowAdapter(this);
+        adapter = new RowAdapter(this, new RowAdapter.OnToggle() {
+            @Override
+            public void toggle(Occurrence o) {
+                boolean now = !o.isDone();
+                agenda.setDone(o.event, o.date(), now);
+                refresh();
+                if (now) Toast.makeText(MainActivity.this, "« " + o.event.displayTitle() + " » : fait ✓", Toast.LENGTH_SHORT).show();
+            }
+        });
         list.setAdapter(adapter);
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
@@ -109,17 +117,17 @@ public class MainActivity extends Activity implements MonthView.Listener {
         TextView fab = new TextView(this);
         fab.setText("+");
         fab.setTextSize(30);
-        fab.setTextColor(0xFFFFFFFF);
+        fab.setTextColor(Ui.GOLD);
         fab.setGravity(Gravity.CENTER);
         fab.setIncludeFontPadding(false);
         fab.setPadding(0, 0, 0, Ui.dp(this, 3));
         GradientDrawable circle = new GradientDrawable();
         circle.setShape(GradientDrawable.OVAL);
-        circle.setColor(Ui.ACCENT);
+        circle.setColor(Ui.BRAND);
         fab.setBackground(new android.graphics.drawable.RippleDrawable(
                 android.content.res.ColorStateList.valueOf(0x40FFFFFF), circle, null));
         fab.setElevation(Ui.dp(this, 6));
-        fab.setContentDescription("Nouvel événement");
+        fab.setContentDescription("Nouvelle tâche ou nouvel événement");
         fab.setClickable(true);
         int size = Ui.dp(this, 60);
         FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(size, size, Gravity.BOTTOM | Gravity.END);
@@ -128,11 +136,17 @@ public class MainActivity extends Activity implements MonthView.Listener {
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                create(selected, false);
+                chooseKind(selected);
             }
         });
 
         setContentView(root);
+        ActionBar ab = getActionBar();
+        if (ab != null) {
+            ab.setLogo(Ui.roundedLogo(this, 32, 10));
+            ab.setDisplayUseLogoEnabled(true);
+            ab.setDisplayShowHomeEnabled(true);
+        }
         askNotificationPermission();
         handleIntent(getIntent());
     }
@@ -202,6 +216,7 @@ public class MainActivity extends Activity implements MonthView.Listener {
             }
         } else if (listMode) {
             if (bar != null) bar.setTitle("Prochains événements");
+            addOverdue(rows, false);
             Map<LocalDate, List<Occurrence>> map = agenda.byDay(today, 92);
             for (Map.Entry<LocalDate, List<Occurrence>> en : map.entrySet()) {
                 if (en.getValue().isEmpty()) continue;
@@ -214,13 +229,26 @@ public class MainActivity extends Activity implements MonthView.Listener {
             if (bar != null) bar.setTitle(Fmt.monthTitle(ym));
             LocalDate first = ym.atDay(1).minusDays(ym.atDay(1).getDayOfWeek().getValue() - 1);
             monthView.set(ym, selected, today, agenda.byDay(first, 42));
+            if (selected.equals(today)) addOverdue(rows, true);
             rows.add(RowAdapter.Row.heading(Fmt.dayHeading(selected, today), selected.equals(today)));
             List<Occurrence> day = agenda.on(selected);
             for (Occurrence o : day) rows.add(RowAdapter.Row.item(o, selected));
-            if (day.isEmpty()) rows.add(RowAdapter.Row.message("Rien de prévu. Touchez + (ou appuyez longuement sur un jour) pour ajouter un événement."));
+            if (day.isEmpty()) rows.add(RowAdapter.Row.message("Rien de prévu. Touchez + (ou appuyez longuement sur un jour) pour ajouter une tâche ou un événement."));
         }
         if (bar != null) bar.setSubtitle(null);
         adapter.setRows(rows);
+    }
+
+    /** Les tâches pas faites des jours précédents, en haut de la liste. */
+    private void addOverdue(List<RowAdapter.Row> rows, boolean beforeToday) {
+        List<Occurrence> late = agenda.overdue(LocalDateTime.now(), 90);
+        List<Occurrence> keep = new ArrayList<Occurrence>();
+        for (Occurrence o : late) {
+            if (!beforeToday || o.date().isBefore(today)) keep.add(o);
+        }
+        if (keep.isEmpty()) return;
+        rows.add(RowAdapter.Row.heading("En retard (" + keep.size() + ")", Ui.DANGER));
+        for (Occurrence o : keep) rows.add(RowAdapter.Row.item(o, null));
     }
 
     @Override
@@ -233,7 +261,7 @@ public class MainActivity extends Activity implements MonthView.Listener {
     public void onDayLongPressed(LocalDate day) {
         selected = day;
         refresh();
-        create(day, false);
+        chooseKind(day);
     }
 
     @Override
@@ -244,6 +272,34 @@ public class MainActivity extends Activity implements MonthView.Listener {
     }
 
     // ------------------------------------------------------------------ événements
+
+    /** Le bouton + : une tâche à faire ou un événement ? */
+    private void chooseKind(final LocalDate day) {
+        String[] items = {"✓  Tâche à faire (avec rappel)", "📅  Événement / rendez-vous", "☀  Événement sur la journée"};
+        new AlertDialog.Builder(this)
+                .setTitle(Fmt.capitalize(Fmt.longDateNoYear(day, today)))
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (which == 0) createTask(day);
+                        else create(day, which == 2);
+                    }
+                })
+                .show();
+    }
+
+    private void createTask(LocalDate day) {
+        LocalDateTime start;
+        if (day.equals(LocalDate.now()) && LocalTime.now().getHour() < 23) {
+            start = day.atTime(LocalTime.now().getHour() + 1, 0);
+        } else {
+            start = day.atTime(9, 0);
+        }
+        Intent i = new Intent(this, EventActivity.class);
+        i.putExtra(EventActivity.EXTRA_START, start.toString());
+        i.putExtra(EventActivity.EXTRA_TASK, true);
+        startActivityForResult(i, REQ_EVENT);
+    }
 
     private void create(LocalDate day, boolean allDay) {
         LocalDateTime start;
@@ -308,9 +364,10 @@ public class MainActivity extends Activity implements MonthView.Listener {
         });
 
         menu.add(0, 3, 2, listMode ? "Vue mois" : "Vue liste").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
-        menu.add(0, 6, 3, "Nouvel événement sur la journée").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+        menu.add(0, 7, 3, "Relevé d'activités").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         menu.add(0, 4, 4, "Importer un fichier .ics").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         menu.add(0, 5, 5, "Exporter l'agenda (.ics)").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+        menu.add(0, 8, 6, "Mon nom").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         return true;
     }
 
@@ -352,8 +409,11 @@ public class MainActivity extends Activity implements MonthView.Listener {
                 startActivityForResult(i, REQ_EXPORT);
                 return true;
             }
-            case 6:
-                create(selected, true);
+            case 7:
+                startActivity(new Intent(this, StatementActivity.class));
+                return true;
+            case 8:
+                askName(this, null);
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -440,6 +500,35 @@ public class MainActivity extends Activity implements MonthView.Listener {
         } catch (IOException | RuntimeException e) {
             Toast.makeText(this, "Écriture impossible : " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
+    }
+
+    /** Nom affiché en tête des relevés. */
+    static String ownerName(android.content.Context c) {
+        return c.getSharedPreferences("agenda", MODE_PRIVATE).getString("owner", "Henry Musangu");
+    }
+
+    static void askName(final Activity a, final Runnable then) {
+        final android.widget.EditText field = new android.widget.EditText(a);
+        field.setText(ownerName(a));
+        field.setSingleLine(true);
+        field.setSelection(field.getText().length());
+        android.widget.FrameLayout box = new android.widget.FrameLayout(a);
+        int p = Ui.dp(a, 20);
+        box.setPadding(p, Ui.dp(a, 8), p, 0);
+        box.addView(field);
+        new AlertDialog.Builder(a)
+                .setTitle("Votre nom (en tête des relevés)")
+                .setView(box)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        String n = field.getText().toString().trim();
+                        a.getSharedPreferences("agenda", MODE_PRIVATE).edit().putString("owner", n).apply();
+                        if (then != null) then.run();
+                    }
+                })
+                .setNegativeButton("Annuler", null)
+                .show();
     }
 
     /** Android 13 et plus : demander une fois l'autorisation d'afficher les rappels. */

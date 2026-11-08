@@ -44,8 +44,18 @@
             android:parentActivityName=".MainActivity"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
+        <activity
+            android:name=".StatementActivity"
+            android:exported="false"
+            android:label="Relevé d'activités"
+            android:parentActivityName=".MainActivity" />
+
         <receiver
             android:name=".ReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".DoneReceiver"
             android:exported="false" />
 
         <receiver

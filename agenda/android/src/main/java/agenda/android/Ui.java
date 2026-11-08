@@ -28,6 +28,12 @@ final class Ui {
     static final int ACCENT_SOFT = 0xFFEAF1FE;
     static final int OUTSIDE = 0xFFF7F8FB;
     static final int DANGER = 0xFFDC2626;
+    static final int SUCCESS = 0xFF16A34A;
+    /** Couleurs du logo HM : noir, or, et le fond crème du logo. */
+    static final int BRAND = 0xFF1A1A1A;
+    static final int GOLD = 0xFFC9962E;
+    static final int GOLD_DARK = 0xFF9A7020;
+    static final int CREAM = 0xFFF4F3F1;
 
     static int dp(Context c, float v) {
         return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, c.getResources().getDisplayMetrics()));
@@ -83,6 +89,21 @@ final class Ui {
         View v = new View(c);
         v.setLayoutParams(new LinearLayout.LayoutParams(dp(c, wDp), dp(c, hDp)));
         return v;
+    }
+
+    /** Le logo aux coins arrondis, à la taille voulue (pour la barre du haut). */
+    static android.graphics.drawable.Drawable roundedLogo(Context c, int sizeDp, int marginRightDp) {
+        int size = dp(c, sizeDp);
+        int margin = dp(c, marginRightDp);
+        android.graphics.Bitmap src = android.graphics.BitmapFactory.decodeResource(c.getResources(), R.drawable.logo);
+        android.graphics.Bitmap out = android.graphics.Bitmap.createBitmap(size + margin, size, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(out);
+        android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG | android.graphics.Paint.FILTER_BITMAP_FLAG);
+        android.graphics.RectF r = new android.graphics.RectF(0, 0, size, size);
+        canvas.drawRoundRect(r, size * 0.22f, size * 0.22f, p);
+        p.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(src, null, r, p);
+        return new android.graphics.drawable.BitmapDrawable(c.getResources(), out);
     }
 
     static int darker(int color, double amount) {

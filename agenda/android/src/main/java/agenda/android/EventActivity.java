@@ -49,6 +49,7 @@ public class EventActivity extends Activity {
     static final String EXTRA_DATE = "date";
     static final String EXTRA_START = "start";
     static final String EXTRA_ALL_DAY = "allDay";
+    static final String EXTRA_TASK = "task";
 
     private static final String[] REPEAT = {"Ne se répète pas", "Tous les jours", "Toutes les semaines", "Tous les mois", "Tous les ans"};
     private static final String[] UNITS = {"", "jour(s)", "semaine(s)", "mois", "an(s)"};
@@ -69,6 +70,13 @@ public class EventActivity extends Activity {
     private LocalDate untilDay;
     private final boolean[] weekdays = new boolean[7];
 
+    private boolean task;
+    private TextView typeTask;
+    private TextView typeEvent;
+    private TextView startLabel;
+    private TextView endLabel;
+    private LinearLayout endPair;
+    private android.widget.CheckBox doneBox;
     private EditText title;
     private EditText location;
     private Spinner category;
@@ -112,14 +120,16 @@ public class EventActivity extends Activity {
             LocalDateTime start = LocalDateTime.parse(in.getStringExtra(EXTRA_START));
             boolean whole = in.getBooleanExtra(EXTRA_ALL_DAY, false);
             base = new Event();
-            base.allDay = whole;
-            base.start = whole ? start.toLocalDate().atStartOfDay() : start;
-            base.end = whole ? base.start.plusDays(1) : start.plusHours(1);
-            base.reminder = whole ? -1 : 15;
+            base.task = in.getBooleanExtra(EXTRA_TASK, false);
+            base.allDay = whole && !base.task;
+            base.start = base.allDay ? start.toLocalDate().atStartOfDay() : start;
+            base.end = base.allDay ? base.start.plusDays(1) : base.task ? start : start.plusHours(1);
+            base.reminder = base.task ? 0 : base.allDay ? -1 : 15;
         }
+        task = base.task;
         ActionBar bar = getActionBar();
         if (bar != null) {
-            bar.setTitle(original == null ? "Nouvel événement" : "Modifier");
+            bar.setTitle(original == null ? (task ? "Nouvelle tâche" : "Nouvel événement") : "Modifier");
             bar.setDisplayHomeAsUpEnabled(true);
             bar.setHomeAsUpIndicator(android.R.drawable.ic_menu_close_clear_cancel);
         }
@@ -140,6 +150,29 @@ public class EventActivity extends Activity {
         int pad = Ui.dp(this, 18);
         form.setPadding(pad, Ui.dp(this, 8), pad, Ui.dp(this, 32));
         scroll.addView(form);
+
+        // Tâche ou événement
+        LinearLayout types = Ui.row(this);
+        types.setPadding(0, Ui.dp(this, 6), 0, Ui.dp(this, 4));
+        typeTask = typeChip("✓  Tâche");
+        typeEvent = typeChip("📅  Événement");
+        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(0, Ui.dp(this, 42), 1);
+        tlp.rightMargin = Ui.dp(this, 8);
+        types.addView(typeTask, tlp);
+        types.addView(typeEvent, new LinearLayout.LayoutParams(0, Ui.dp(this, 42), 1));
+        form.addView(types, full());
+        typeTask.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setTask(true);
+            }
+        });
+        typeEvent.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setTask(false);
+            }
+        });
 
         title = edit("Titre", false);
         title.setTextSize(22);
@@ -162,14 +195,23 @@ public class EventActivity extends Activity {
         allDay.setPadding(0, Ui.dp(this, 14), 0, Ui.dp(this, 6));
         form.addView(allDay, full());
 
-        form.addView(label("Début"));
+        startLabel = label("Début");
+        form.addView(startLabel);
         startDateBtn = pickerButton();
         startTimeBtn = pickerButton();
         form.addView(pair(startDateBtn, startTimeBtn), full());
-        form.addView(label("Fin"));
+        endLabel = label("Fin");
+        form.addView(endLabel);
         endDateBtn = pickerButton();
         endTimeBtn = pickerButton();
-        form.addView(pair(endDateBtn, endTimeBtn), full());
+        endPair = pair(endDateBtn, endTimeBtn);
+        form.addView(endPair, full());
+        doneBox = new android.widget.CheckBox(this);
+        doneBox.setText("C'est fait");
+        doneBox.setTextSize(16);
+        doneBox.setTextColor(Ui.TEXT);
+        doneBox.setPadding(0, Ui.dp(this, 8), 0, Ui.dp(this, 8));
+        form.addView(doneBox, full());
 
         form.addView(label("Répétition"));
         repeat = spinner(REPEAT);
@@ -258,7 +300,7 @@ public class EventActivity extends Activity {
         }
         // identifiants fixes : Android conserve ainsi les saisies quand on tourne l'écran
         int id = 1000;
-        for (View v : new View[] {title, location, category, allDay, repeat, interval, endMode, count, reminder, notes}) {
+        for (View v : new View[] {title, location, category, allDay, repeat, interval, endMode, count, reminder, notes, doneBox}) {
             v.setId(++id);
         }
         setContentView(scroll);
@@ -274,6 +316,38 @@ public class EventActivity extends Activity {
         t.setPadding(Ui.dp(this, 4), Ui.dp(this, 16), 0, Ui.dp(this, 2));
         t.setLetterSpacing(0.06f);
         return t;
+    }
+
+    private TextView typeChip(String text) {
+        TextView t = Ui.text(this, text, 15, Ui.TEXT, true);
+        t.setGravity(Gravity.CENTER);
+        t.setClickable(true);
+        return t;
+    }
+
+    private void setTask(boolean value) {
+        if (value == task) return;
+        task = value;
+        if (task) {
+            if (allDay.isChecked()) allDay.setChecked(false);
+            if (reminder.getSelectedItemPosition() == indexOfReminder(15)) reminder.setSelection(indexOfReminder(0));
+        } else {
+            if (!endDay.atTime(endTime).isAfter(startDay.atTime(startTime))) {
+                LocalDateTime e = startDay.atTime(startTime).plusHours(1);
+                endDay = e.toLocalDate();
+                endTime = e.toLocalTime();
+            }
+            if (reminder.getSelectedItemPosition() == indexOfReminder(0)) reminder.setSelection(indexOfReminder(15));
+        }
+        ActionBar bar = getActionBar();
+        if (bar != null && original == null) bar.setTitle(task ? "Nouvelle tâche" : "Nouvel événement");
+        paintButtons();
+        updateVisibility();
+    }
+
+    private static int indexOfReminder(int minutes) {
+        for (int i = 0; i < Fmt.REMINDERS.length; i++) if (Fmt.REMINDERS[i] == minutes) return i;
+        return 0;
     }
 
     private EditText edit(String hint, boolean multi) {
@@ -367,6 +441,7 @@ public class EventActivity extends Activity {
         for (int i = 0; i < Fmt.REMINDERS.length; i++) if (Fmt.REMINDERS[i] == e.reminder) idx = i;
         reminder.setSelection(idx);
         notes.setText(e.notes);
+        doneBox.setChecked(e.task && e.isDone(occurrenceDate != null ? occurrenceDate : startDay));
         loading = false;
         paintButtons();
         paintChips();
@@ -438,9 +513,18 @@ public class EventActivity extends Activity {
         out.location = location.getText().toString().trim();
         out.notes = notes.getText().toString().trim();
         out.category = (Category) category.getSelectedItem();
-        out.allDay = allDay.isChecked();
-        out.start = start();
-        out.end = end();
+        out.task = task;
+        out.allDay = allDay.isChecked() && !task;
+        out.start = task ? startDay.atTime(startTime) : start();
+        out.end = task ? out.start : end();
+        LocalDate occ = occurrenceDate != null ? occurrenceDate : startDay;
+        if (!task) {
+            out.done.clear();
+        } else if (doneBox.isChecked()) {
+            out.done.add(occ);
+        } else {
+            out.done.remove(occ);
+        }
         out.recurrence = recurrence();
         if (out.recurrence == null) out.exdates.clear();
         out.reminder = Fmt.REMINDERS[Math.max(0, reminder.getSelectedItemPosition())];
@@ -451,7 +535,7 @@ public class EventActivity extends Activity {
     private String snapshot() {
         Event e = build(base);
         Recurrence r = e.recurrence;
-        return e.title + "|" + e.location + "|" + e.notes + "|" + e.category + "|" + e.allDay + "|" + e.start + "|" + e.end
+        return e.task + "|" + e.done + "|" + e.title + "|" + e.location + "|" + e.notes + "|" + e.category + "|" + e.allDay + "|" + e.start + "|" + e.end
                 + "|" + e.reminder + "|" + (r == null ? "-" : r.freq + "/" + r.interval + "/" + r.days + "/" + r.weekOfMonth + "/" + r.until + "/" + r.count);
     }
 
@@ -632,7 +716,16 @@ public class EventActivity extends Activity {
     }
 
     private void updateVisibility() {
-        boolean timed = !allDay.isChecked();
+        boolean timed = task || !allDay.isChecked();
+        allDay.setVisibility(task ? View.GONE : View.VISIBLE);
+        endLabel.setVisibility(task ? View.GONE : View.VISIBLE);
+        endPair.setVisibility(task ? View.GONE : View.VISIBLE);
+        doneBox.setVisibility(task && original != null ? View.VISIBLE : View.GONE);
+        startLabel.setText(task ? "DATE ET HEURE" : "DÉBUT");
+        typeTask.setBackground(task ? Ui.round(Ui.BRAND, Ui.dp(this, 21), 0, 0) : Ui.round(Ui.SURFACE, Ui.dp(this, 21), Ui.BORDER, Ui.dp(this, 1)));
+        typeTask.setTextColor(task ? 0xFFFFFFFF : Ui.TEXT);
+        typeEvent.setBackground(!task ? Ui.round(Ui.BRAND, Ui.dp(this, 21), 0, 0) : Ui.round(Ui.SURFACE, Ui.dp(this, 21), Ui.BORDER, Ui.dp(this, 1)));
+        typeEvent.setTextColor(!task ? 0xFFFFFFFF : Ui.TEXT);
         startTimeBtn.setVisibility(timed ? View.VISIBLE : View.INVISIBLE);
         endTimeBtn.setVisibility(timed ? View.VISIBLE : View.INVISIBLE);
         int r = repeat.getSelectedItemPosition();
@@ -654,7 +747,7 @@ public class EventActivity extends Activity {
 
     private void save() {
         final Event edited = build(base);
-        if (edited.end.isBefore(edited.start)) {
+        if (!edited.task && edited.end.isBefore(edited.start)) {
             Toast.makeText(this, "La fin doit être après le début.", Toast.LENGTH_LONG).show();
             return;
         }
@@ -785,6 +878,7 @@ public class EventActivity extends Activity {
         out.putLong("untilDay", untilDay.toEpochDay());
         out.putBooleanArray("weekdays", weekdays);
         out.putInt("monthMode", monthMode.getSelectedItemPosition());
+        out.putBoolean("task", task);
     }
 
     private void restore(Bundle s) {
@@ -793,6 +887,7 @@ public class EventActivity extends Activity {
         endDay = LocalDate.ofEpochDay(s.getLong("endDay", endDay.toEpochDay()));
         endTime = LocalTime.parse(s.getString("endTime", endTime.toString()));
         untilDay = LocalDate.ofEpochDay(s.getLong("untilDay", untilDay.toEpochDay()));
+        task = s.getBoolean("task", task);
         boolean[] w = s.getBooleanArray("weekdays");
         if (w != null && w.length == 7) System.arraycopy(w, 0, weekdays, 0, 7);
         fillMonthModes(0);

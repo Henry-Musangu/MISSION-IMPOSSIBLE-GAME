@@ -31,6 +31,16 @@ public final class Occurrence implements Comparable<Occurrence> {
         return event.allDay || (!start.isAfter(day.atStartOfDay()) && !end.isBefore(day.plusDays(1).atStartOfDay()));
     }
 
+    /** Une tâche cochée comme faite ? */
+    public boolean isDone() {
+        return event.isDone(date());
+    }
+
+    /** Une tâche pas faite dont l'heure est passée ? */
+    public boolean isOverdue(LocalDateTime now) {
+        return event.task && !isDone() && start.isBefore(now);
+    }
+
     /** S'étend-elle sur plusieurs jours ? */
     public boolean isMultiDay() {
         return event.lastDayFrom(date()).isAfter(date());
