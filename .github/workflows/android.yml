@@ -1,6 +1,7 @@
-# Compile automatiquement l'APK Android (et vérifie la version PC) à chaque envoi sur GitHub,
-# puis le publie dans la Release « android » : lien direct à ouvrir depuis le téléphone
+# Compile automatiquement les APK Android (et vérifie la version PC du jeu) à chaque envoi sur GitHub,
+# puis les publie dans la Release « android » : liens directs à ouvrir depuis le téléphone
 # https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/latest/download/henry-le-herisson.apk
+# https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/latest/download/ma-quincaillerie.apk
 name: APK Android
 
 on:
@@ -28,25 +29,31 @@ jobs:
           mkdir -p out
           javac -encoding UTF-8 -d out core/src/main/java/henry/*.java desktop/src/main/java/henry/desktop/*.java
 
-      - name: Compiler l'APK Android
+      - name: Compiler les APK Android
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon :app:assembleDebug
+          ./gradlew --no-daemon :app:assembleDebug :quincaillerie:assembleDebug
           cp android/build/outputs/apk/debug/app-debug.apk henry-le-herisson.apk
+          cp quincaillerie/build/outputs/apk/debug/quincaillerie-debug.apk ma-quincaillerie.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: henry-le-herisson-apk
           path: henry-le-herisson.apk
 
-      - name: Publier l'APK dans la Release « android »
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ma-quincaillerie-apk
+          path: ma-quincaillerie.apk
+
+      - name: Publier les APK dans la Release « android »
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view android >/dev/null 2>&1; then
-            gh release upload android henry-le-herisson.apk --clobber
+            gh release upload android henry-le-herisson.apk ma-quincaillerie.apk --clobber
           else
-            gh release create android henry-le-herisson.apk --target "$GITHUB_SHA" --latest \
-              --title "Henry le Hérisson pour Android" \
-              --notes "Télécharge henry-le-herisson.apk sur ton téléphone et ouvre-le pour installer le jeu. Ce fichier est remplacé automatiquement à chaque mise à jour du code."
+            gh release create android henry-le-herisson.apk ma-quincaillerie.apk --target "$GITHUB_SHA" --latest \
+              --title "Applications Android" \
+              --notes "Télécharge henry-le-herisson.apk (le jeu) ou ma-quincaillerie.apk (la gestion de la quincaillerie) sur ton téléphone et ouvre le fichier pour l'installer. Ces fichiers sont remplacés automatiquement à chaque mise à jour du code."
           fi

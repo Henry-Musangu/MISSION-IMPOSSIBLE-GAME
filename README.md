@@ -16,6 +16,11 @@ invincibilité, vie, anneaux), plates-formes mobiles, routes cachées en hauteur
 pour chaque zone, sauvegarde de la progression et du meilleur score, choix de la zone au menu,
 vibrations sur téléphone.
 
+> **Aussi dans ce dépôt : Ma Quincaillerie**, une application Android de gestion quotidienne
+> d'une quincaillerie (ventes, stock, marges, caisse, dettes clients, bilan).
+> Notice et analyse de démarrage : [`quincaillerie/README.md`](quincaillerie/README.md) ·
+> APK : https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/latest/download/ma-quincaillerie.apk
+
 ## Jouer sur Android
 
 ### Option 1 : télécharger l'APK (le plus simple)
@@ -119,6 +124,7 @@ qu'afficher l'image, lire les commandes et jouer les sons.
 | `core/.../Input.java`, `Sound.java` | Boutons du jeu et bruitages synthétisés |
 | `desktop/` | Version PC : fenêtre Swing, clavier, son javax.sound |
 | `android/` | Version Android : écran tactile, `SurfaceView`, son `SoundPool`, icône |
+| `quincaillerie/` | Application séparée « Ma Quincaillerie » (voir sa propre notice) |
 
 ### Créer ton propre niveau
 

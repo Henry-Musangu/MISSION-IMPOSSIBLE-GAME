@@ -19,3 +19,4 @@ rootProject.name = 'HenryLeHerisson'
 include ':core'
 include ':app'
 project(':app').projectDir = file('android')
+include ':quincaillerie'
