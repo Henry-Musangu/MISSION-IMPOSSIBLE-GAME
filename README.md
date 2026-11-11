@@ -19,7 +19,7 @@ vibrations sur téléphone.
 > **Aussi dans ce dépôt : Ma Quincaillerie**, une application Android de gestion quotidienne
 > d'une quincaillerie (ventes, stock, marges, caisse, dettes clients, bilan).
 > Notice et analyse de démarrage : [`quincaillerie/README.md`](quincaillerie/README.md) ·
-> APK : https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/latest/download/ma-quincaillerie.apk
+> APK : https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/download/android/ma-quincaillerie.apk
 
 ## Jouer sur Android
 

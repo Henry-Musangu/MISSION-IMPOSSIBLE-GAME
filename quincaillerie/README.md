@@ -9,7 +9,7 @@ marge, prix de vente, seuils d'alerte, monnaie).
 
 Depuis le téléphone, ouvrir ce lien puis le fichier téléchargé :
 
-**https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/latest/download/ma-quincaillerie.apk**
+**https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/download/android/ma-quincaillerie.apk**
 
 Android demande d'autoriser l'installation depuis le navigateur : accepter. Pour mettre à jour,
 retélécharger avec le même lien et installer par-dessus : les données sont conservées

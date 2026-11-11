@@ -1,7 +1,7 @@
 # Compile automatiquement les APK Android (et vérifie la version PC du jeu) à chaque envoi sur GitHub,
 # puis les publie dans la Release « android » : liens directs à ouvrir depuis le téléphone
 # https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/latest/download/henry-le-herisson.apk
-# https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/latest/download/ma-quincaillerie.apk
+# https://github.com/Henry-Musangu/MISSION-IMPOSSIBLE-GAME/releases/download/android/ma-quincaillerie.apk
 name: APK Android
 
 on:
